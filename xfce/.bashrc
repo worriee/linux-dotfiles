@@ -115,29 +115,71 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
-
 export NVM_DIR="$HOME/.config/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 # opencode
-export PATH=/home/julry/.opencode/bin:$PATH
+export PATH="/home/julry/.opencode/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 
 if [ "$PWD" = "$HOME" ]; then
     fastfetch
 fi
 
-# Acer Battery Control Aliases
-# Limit charging threshold to 80%
-alias batt80='echo 1 | sudo tee /sys/bus/wmi/drivers/acer-wmi-battery/health_mode'
-
-# Allow charging threshold up to 100%
-alias batt100='echo 0 | sudo tee /sys/bus/wmi/drivers/acer-wmi-battery/health_mode'
-
-# Check active charging mode
-alias battstat='cat /sys/bus/wmi/drivers/acer-wmi-battery/health_mode'
 eval "$(starship init bash)"
 
-# Flush the ZRAM compressed pool and restart the graphical desktop session
-alias fresh='(sudo systemctl restart zramswap 2>/dev/null || sudo systemctl restart zram-config) && sudo systemctl restart lightdm'
 export NODE_OPTIONS="--max-old-space-size=1536"
+
+# Flush the ZRAM compressed pool and restart the graphical desktop session
+alias rest='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager' # distro-fresh-alias
+alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: swappiness 10'
+alias code='sudo /usr/sbin/sysctl -w vm.swappiness=180 >/dev/null && echo code: swappiness 180'
+
+#zed + zoxide + fzf aliases
+zzed() {
+  if [ "$1" = "-i" ]; then
+    local target
+    target="$(zoxide query -i "${@:2}")" || return 1
+    [ -n "$target" ] && zed "$target"
+    return
+  fi
+
+  if [ $# -eq 0 ]; then
+    zed .
+    return
+  fi
+
+  local joined
+  joined="$(IFS="/"; echo "$*")"
+  if [ -e "$joined" ]; then
+    zed "$joined"
+    return
+  fi
+
+  local target
+  target="$(zoxide query "$@" 2>/dev/null)"
+  if [ -n "$target" ]; then
+    zed "$target"
+    return
+  fi
+
+  if [ $# -gt 1 ]; then
+    local dir_keywords=("${@:1:$#-1}")
+    local file_name="${!#}"
+    target="$(zoxide query "${dir_keywords[@]}" 2>/dev/null)"
+    if [ -n "$target" ]; then
+      zed "$target/$file_name"
+      return
+    fi
+  fi
+
+  target="$(zoxide query -i "$@")" || return 1
+  if [ -n "$target" ]; then
+    zed "$target"
+  else
+    echo "zzed: could not find '$*' locally or in zoxide"
+    return 1
+  fi
+}
+eval "$(zoxide init bash --cmd cd)"

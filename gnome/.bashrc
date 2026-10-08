@@ -132,6 +132,54 @@ eval "$(starship init bash)"
 export NODE_OPTIONS="--max-old-space-size=1536"
 
 # Flush the ZRAM compressed pool and restart the graphical desktop session
-alias fresh='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager' # distro-fresh-alias
+alias rest='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager' # distro-fresh-alias
 alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: swappiness 10'
-alias code='sudo /usr/sbin/sysctl -w vm.swappiness=200 >/dev/null && echo code: swappiness 200'
+alias code='sudo /usr/sbin/sysctl -w vm.swappiness=180 >/dev/null && echo code: swappiness 180'
+
+#zed + zoxide + fzf aliases
+zzed() {
+  if [ "$1" = "-i" ]; then
+    local target
+    target="$(zoxide query -i "${@:2}")" || return 1
+    [ -n "$target" ] && zed "$target"
+    return
+  fi
+
+  if [ $# -eq 0 ]; then
+    zed .
+    return
+  fi
+
+  local joined
+  joined="$(IFS="/"; echo "$*")"
+  if [ -e "$joined" ]; then
+    zed "$joined"
+    return
+  fi
+
+  local target
+  target="$(zoxide query "$@" 2>/dev/null)"
+  if [ -n "$target" ]; then
+    zed "$target"
+    return
+  fi
+
+  if [ $# -gt 1 ]; then
+    local dir_keywords=("${@:1:$#-1}")
+    local file_name="${!#}"
+    target="$(zoxide query "${dir_keywords[@]}" 2>/dev/null)"
+    if [ -n "$target" ]; then
+      zed "$target/$file_name"
+      return
+    fi
+  fi
+
+  target="$(zoxide query -i "$@")" || return 1
+  if [ -n "$target" ]; then
+    zed "$target"
+  else
+    echo "zzed: could not find '$*' locally or in zoxide"
+    return 1
+  fi
+}
+eval "$(zoxide init bash --cmd cd)"
