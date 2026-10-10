@@ -183,3 +183,12 @@ zzed() {
   fi
 }
 eval "$(zoxide init bash --cmd cd)"
+
+# command: repo ref //refreshes the /home/julry/repo folders to add them in zzed -i ui
+repo() {
+  if [ "$1" = "ref" ]; then
+    for d in "$HOME/repo"/*/; do
+      [ -d "$d" ] && zoxide add "$d"
+    done
+  fi
+}

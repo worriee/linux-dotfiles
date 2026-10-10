@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Allow Root GUI Apps
+Exec=xhost +si:localuser:root
+Terminal=false
