@@ -137,30 +137,37 @@ alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: s
 alias code='sudo /usr/sbin/sysctl -w vm.swappiness=180 >/dev/null && echo code: swappiness 180'
 
 #zed + zoxide + fzf aliases
+_launch_and_exit() {
+  local target="$1"
+  nohup zed "$target" >/dev/null 2>&1 &
+  disown
+  exit 0
+}
+
 zzed() {
   if [ "$1" = "-i" ]; then
     local target
     target="$(zoxide query -i "${@:2}")" || return 1
-    [ -n "$target" ] && zed "$target"
+    [ -n "$target" ] && _launch_and_exit "$target"
     return
   fi
 
   if [ $# -eq 0 ]; then
-    zed .
+    _launch_and_exit .
     return
   fi
 
   local joined
   joined="$(IFS="/"; echo "$*")"
   if [ -e "$joined" ]; then
-    zed "$joined"
+    _launch_and_exit "$joined"
     return
   fi
 
   local target
   target="$(zoxide query "$@" 2>/dev/null)"
   if [ -n "$target" ]; then
-    zed "$target"
+    _launch_and_exit "$target"
     return
   fi
 
@@ -169,20 +176,19 @@ zzed() {
     local file_name="${!#}"
     target="$(zoxide query "${dir_keywords[@]}" 2>/dev/null)"
     if [ -n "$target" ]; then
-      zed "$target/$file_name"
+      _launch_and_exit "$target/$file_name"
       return
     fi
   fi
 
   target="$(zoxide query -i "$@")" || return 1
   if [ -n "$target" ]; then
-    zed "$target"
+    _launch_and_exit "$target"
   else
     echo "zzed: could not find '$*' locally or in zoxide"
     return 1
   fi
 }
-eval "$(zoxide init bash --cmd cd)"
 
 # command: repo ref //refreshes the /home/julry/repo folders to add them in zzed -i ui
 repo() {
