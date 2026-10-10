@@ -116,7 +116,7 @@
       "type": "command",
       "key": "age     ",
       "keyIcon": "",
-      "text": "echo \"$(( ($(date +%s) - $(stat -c %W /)) / 86400 )) days · since $(LC_ALL=C date -d \"@$(stat -c %W /)\" '+%d %b %Y')\"",
+      "text": "echo \"$(( ($(date +%s) - $(stat -c %W /)) / 86400 )) days\"",
     },
     {
       "type": "custom",
