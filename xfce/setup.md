@@ -12,6 +12,15 @@ Run in this order after a fresh install.
 - Mint / Ubuntu (apt): full flow, including the GRUB-timeout step and `zram-tools` (`/etc/default/zramswap`).
 - openSUSE Tumbleweed XFCE (zypper): same script, branched — `zram-generator` instead of `zram-tools`, `/etc/sysconfig/earlyoom`, slick-greeter via `lightdm-slick-greeter` + `update-alternatives`, GRUB step skipped (bootloader untouched), btrfs root auto-skips the ext4 reserve step, snapper `pre-dotfiles` snapshot.
 - Older prose below may predate the XFCE-only scope; this section is authoritative.
+- **Icon theme is not vendored.** `xfce/.icons/` (WhiteSur-grey) was 187MB across 43,099 files — 98% of everything in this repo — and was removed so clones stay small. `setup.sh` therefore does **not** install icons. Install the theme yourself before relying on the `WhiteSur-grey-dark` references in §5 (rofi Type-3 launcher):
+
+  ```bash
+  # Clone the theme into your user icon path, then refresh the cache.
+  git clone --depth 1 <whitesur-icons-upstream> ~/.icons/WhiteSur-grey-dark
+  fc-cache -f
+  ```
+
+  Upstream URL not pinned here on purpose — the repo does not track this dependency, so verify the source before cloning. The rofi launcher will fall back to the system icon theme if the theme is absent; it will not error.
 
 ---
 

@@ -6,6 +6,7 @@
 set -u
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../common" 2>/dev/null && pwd)"
 HOME_DIR="${HOME}"
 OK()   { printf '  \033[32m[ok]\033[0m %s\n' "$*"; }
 WARN() { printf '  \033[33m[!!]\033[0m %s\n' "$*"; }
@@ -57,11 +58,30 @@ echo "==============================================="
 # 1. Fix hardcoded paths in repo copies
 # ------------------------------------------------
 STEP "Fixing hardcoded paths (/home/julry -> $HOME_DIR)"
-sed -i "s|/home/julry|$HOME_DIR|g" \
-    "$REPO/.config/opencode/opencode.jsonc" \
-    "$REPO/.bashrc" \
-    "$REPO/dconf/dash-to-panel.dconf" 2>/dev/null || true
-OK "paths rewritten"
+_PATH_FILES=()
+for _f in "$COMMON_DIR/.config/opencode/opencode.jsonc" "$COMMON_DIR/.bashrc" "$REPO/dconf/dash-to-panel.dconf"; do
+    [ -f "$_f" ] && _PATH_FILES+=("$_f")
+done
+if [ "$HOME_DIR" = "/home/julry" ]; then
+    # The rewrite target equals the source: sed would be a no-op, and a
+    # "no /home/julry left" check would false-positive on every run here.
+    OK "HOME is already /home/julry — nothing to rewrite (${#_PATH_FILES[@]} file(s) checked)"
+elif [ "${#_PATH_FILES[@]}" -eq 0 ]; then
+    WARN "no path-carrying files found — rewrite skipped"
+else
+    if sed -i "s|/home/julry|$HOME_DIR|g" "${_PATH_FILES[@]}"; then
+        _LEFT="$(grep -l '/home/julry' "${_PATH_FILES[@]}" 2>/dev/null || true)"
+        if [ -z "${_LEFT:-}" ]; then
+            OK "paths rewritten in ${#_PATH_FILES[@]} file(s), no /home/julry left"
+        else
+            WARN "path rewrite incomplete: $_LEFT"; FAILED_STEPS+=("path rewrite verify")
+        fi
+        unset _LEFT
+    else
+        WARN "sed failed on: ${_PATH_FILES[*]}"; FAILED_STEPS+=("path rewrite")
+    fi
+fi
+unset _f _PATH_FILES
 
 # ------------------------------------------------
 # 2. Packages (sudo) — openSUSE only
@@ -79,19 +99,26 @@ STEP "Starship prompt engine"
 if command -v starship >/dev/null; then
     OK "starship already installed"
 else
-    if curl -sS https://starship.rs/install.sh | sh -s -- -y; then OK "starship installed"
-    else WARN "starship install failed — see setup.md Section 8"; FAILED_STEPS+=("starship install"); fi
+    _SH_TMP="$(mktemp)"
+    # -fsSL: a 404/500 body must never reach `sh`, so download first and only
+    # run it when curl succeeded and the file is non-empty.
+    if curl -fsSL -o "$_SH_TMP" https://starship.rs/install.sh && [ -s "$_SH_TMP" ] && sh "$_SH_TMP" -s -- -y; then
+        rm -f "$_SH_TMP"; OK "starship installed"
+    else
+        rm -f "$_SH_TMP"; WARN "starship install failed — see setup.md Section 8"; FAILED_STEPS+=("starship install")
+    fi
 fi
+unset _SH_TMP
 
-# Install repo .bashrc (custom aliases: fresh) — idempotent
-STEP "Installing .bashrc (alias: fresh)"
-if grep -q '^alias fresh=' "$HOME_DIR/.bashrc" 2>/dev/null; then
+# Install repo .bashrc (custom aliases: rest) — idempotent
+STEP "Installing .bashrc (alias: rest)"
+if [ -f "$HOME_DIR/.bashrc" ] && cmp -s "$COMMON_DIR/.bashrc" "$HOME_DIR/.bashrc"; then
     OK ".bashrc aliases already present"
-elif [ -f "$REPO/.bashrc" ]; then
-    cp -b "$REPO/.bashrc" "$HOME_DIR/.bashrc"
+elif [ -f "$COMMON_DIR/.bashrc" ]; then
+    cp -b "$COMMON_DIR/.bashrc" "$HOME_DIR/.bashrc"
     OK ".bashrc installed (backup: .bashrc~)"
 else
-    WARN "$REPO/.bashrc missing — aliases skipped"
+    WARN "$COMMON_DIR/.bashrc missing — aliases skipped"
 fi
 
 # Hook starship into bash (idempotent)
@@ -102,25 +129,25 @@ else
     OK "starship hook already in .bashrc"
 fi
 
-# Distro-specific `fresh` alias — rewrite the alias line in place (idempotent)
-STEP "Setting distro-specific fresh alias ($DISTRO)"
-_FRESH_LINE="alias fresh='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager' # distro-fresh-alias"
+# Distro-specific `rest` alias — rewrite the alias line in place (idempotent)
+STEP "Setting distro-specific rest alias ($DISTRO)"
+_REST_LINE="alias rest='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager' # distro-fresh-alias"
 if [ -f "$HOME_DIR/.bashrc" ]; then
-    if grep -qF "$_FRESH_LINE" "$HOME_DIR/.bashrc" 2>/dev/null; then
-        OK "fresh alias already correct for $DISTRO"
+    if grep -qF "$_REST_LINE" "$HOME_DIR/.bashrc" 2>/dev/null; then
+        OK "rest alias already correct for $DISTRO"
     else
-        sed -i '/# distro-fresh-alias/d; /^alias fresh=/d' "$HOME_DIR/.bashrc"
-        echo "$_FRESH_LINE" >> "$HOME_DIR/.bashrc"
-        OK "fresh alias set for $DISTRO"
+        sed -i '/# distro-fresh-alias$/d' "$HOME_DIR/.bashrc"
+        echo "$_REST_LINE" >> "$HOME_DIR/.bashrc"
+        OK "rest alias set for $DISTRO"
     fi
 else
-    WARN "$HOME_DIR/.bashrc missing — fresh alias skipped"
+    WARN "$HOME_DIR/.bashrc missing — rest alias skipped"
 fi
-unset _FRESH_LINE
+unset _REST_LINE
 
 # Swappiness profile aliases — game low, code max (idempotent)
 STEP "Swappiness aliases game/code"
-for _AL in "alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: swappiness 10'" "alias code='sudo /usr/sbin/sysctl -w vm.swappiness=200 >/dev/null && echo code: swappiness 200'"; do
+for _AL in "alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: swappiness 10'" "alias code='sudo /usr/sbin/sysctl -w vm.swappiness=180 >/dev/null && echo code: swappiness 180'"; do
     _KEY="${_AL%%=*}"
     if grep -qF "$_AL" "$HOME_DIR/.bashrc" 2>/dev/null; then
         OK "$_KEY already present"
@@ -146,6 +173,14 @@ fi
 # ------------------------------------------------
 STEP "Copying dotfiles (kitty, starship, fastfetch, opencode)"
 mkdir -p "$HOME_DIR/.config"
+# Shared config first; DE-specific files below win on any conflict.
+if [ -d "$COMMON_DIR/.config" ]; then
+    mkdir -p "$HOME_DIR/.config"
+    cp -rb "$COMMON_DIR/.config/." "$HOME_DIR/.config/"
+    OK "shared config applied from common/"
+else
+    WARN "common/.config missing — shared dotfiles skipped"
+fi
 # -b: back up any pre-existing file as <name>~
 if [ -d "$REPO/.config" ]; then
     cp -rb "$REPO/.config/." "$HOME_DIR/.config/"
@@ -225,7 +260,7 @@ fi
 # ------------------------------------------------
 # 5. System tweaks (sudo)
 # ------------------------------------------------
-run_step "Swappiness 200 + page-cluster 0 (zram)" bash -c 'printf "vm.swappiness=200\nvm.page-cluster=0\n" | sudo tee /etc/sysctl.d/99-swappiness.conf >/dev/null && sudo sysctl --system >/dev/null'
+run_step "Swappiness 180 + page-cluster 0 (zram)" bash -c 'printf "vm.swappiness=180\nvm.page-cluster=0\n" | sudo tee /etc/sysctl.d/99-swappiness.conf >/dev/null && sudo sysctl --system >/dev/null'
 
 OK "bootloader untouched (by design)"
 OK "btrfs root — ext4 reserve N/A (snapper covers rollback)"
@@ -381,7 +416,7 @@ echo
 echo "==============================================="
 echo " DONE — summary"
 echo "==============================================="
-echo " applied : dotfiles (kitty, starship, fastfetch, opencode), .bashrc fresh alias,"
+echo " applied : dotfiles (kitty, starship, fastfetch, opencode), .bashrc rest alias,"
 echo "           GNOME extensions (3 IDs), dconf dumps + keybinds, blur-my-shell panel+apps,"
 echo "           animations off, download-updates off, localsearch+evolution masked,"
 echo "           cups/avahi disabled (BT kept), swappiness, VM tuning, earlyoom,"
@@ -407,4 +442,7 @@ if [ -t 0 ]; then
 else
     echo "Non-interactive shell — restart skipped (run manually)."
 fi
+# The step-collector pattern is fine, but the exit code must reflect it or a
+# wrapper/CI sees success on a run where every step failed.
+[ "${#FAILED_STEPS[@]}" -gt 0 ] && exit 1
 exit 0

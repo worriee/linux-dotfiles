@@ -36,7 +36,7 @@ Swappiness controls how aggressively Linux moves idle RAM pages into swap instea
 1. Write the drop-in and apply:
 
 ```bash
-printf "vm.swappiness=200\nvm.page-cluster=0\n" | sudo tee /etc/sysctl.d/99-swappiness.conf
+printf "vm.swappiness=180\nvm.page-cluster=0\n" | sudo tee /etc/sysctl.d/99-swappiness.conf
 sudo sysctl --system
 ```
 
@@ -668,7 +668,7 @@ _(Expected: free space climbs back up, the running kernel's entry is untouched, 
 
 | Item | Default | New Value | Benefit |
 | -------------------------- | ------------- | ------------------ | -------------------------------------------------------- |
-| **vm.swappiness** | `60` | `200` (`game` 10) | Max zram first; SSD failsafe; `game` lowers for gaming |
+| **vm.swappiness** | `60` | `180` (`game` 10) | zram-first; SSD failsafe; `game` lowers for gaming |
 | **vm.page-cluster** | `0` | `0` | One page per swap I/O — no zram CPU waste |
 | **vm.vfs_cache_pressure** | `100` | `125` | Faster cache reclaim — RAM freed for editors/builds |
 | **vm.dirty_ratio** | `20` | `10` | Smaller writeback bursts — no save/git stalls |

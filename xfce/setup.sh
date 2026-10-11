@@ -6,6 +6,7 @@
 set -u
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../common" 2>/dev/null && pwd)"
 HOME_DIR="${HOME}"
 OK()   { printf '  \033[32m[ok]\033[0m %s\n' "$*"; }
 WARN() { printf '  \033[33m[!!]\033[0m %s\n' "$*"; }
@@ -59,10 +60,30 @@ echo "==============================================="
 # 1. Fix hardcoded paths in repo copies
 # ------------------------------------------------
 STEP "Fixing hardcoded paths (/home/julry -> $HOME_DIR)"
-sed -i "s|/home/julry|$HOME_DIR|g" \
-    "$REPO/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-keyboard-shortcuts.xml" \
-    "$REPO/.config/opencode/opencode.jsonc"
-OK "paths rewritten"
+_PATH_FILES=()
+for _f in "$REPO/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-keyboard-shortcuts.xml" "$COMMON_DIR/.config/opencode/opencode.jsonc"; do
+    [ -f "$_f" ] && _PATH_FILES+=("$_f")
+done
+if [ "$HOME_DIR" = "/home/julry" ]; then
+    # The rewrite target equals the source: sed would be a no-op, and a
+    # "no /home/julry left" check would false-positive on every run here.
+    OK "HOME is already /home/julry — nothing to rewrite (${#_PATH_FILES[@]} file(s) checked)"
+elif [ "${#_PATH_FILES[@]}" -eq 0 ]; then
+    WARN "no path-carrying files found — rewrite skipped"
+else
+    if sed -i "s|/home/julry|$HOME_DIR|g" "${_PATH_FILES[@]}"; then
+        _LEFT="$(grep -l '/home/julry' "${_PATH_FILES[@]}" 2>/dev/null || true)"
+        if [ -z "${_LEFT:-}" ]; then
+            OK "paths rewritten in ${#_PATH_FILES[@]} file(s), no /home/julry left"
+        else
+            WARN "path rewrite incomplete: $_LEFT"; FAILED_STEPS+=("path rewrite verify")
+        fi
+        unset _LEFT
+    else
+        WARN "sed failed on: ${_PATH_FILES[*]}"; FAILED_STEPS+=("path rewrite")
+    fi
+fi
+unset _f _PATH_FILES
 
 # ------------------------------------------------
 # 2. Packages (sudo) — per-distro list, installed via pkg helpers
@@ -84,19 +105,26 @@ STEP "Starship prompt engine"
 if command -v starship >/dev/null; then
     OK "starship already installed"
 else
-    if curl -sS https://starship.rs/install.sh | sh -s -- -y; then OK "starship installed"
-    else WARN "starship install failed — see setup.md Section 9"; FAILED_STEPS+=("starship install"); fi
+    _SH_TMP="$(mktemp)"
+    # -fsSL: a 404/500 body must never reach `sh`, so download first and only
+    # run it when curl succeeded and the file is non-empty.
+    if curl -fsSL -o "$_SH_TMP" https://starship.rs/install.sh && [ -s "$_SH_TMP" ] && sh "$_SH_TMP" -s -- -y; then
+        rm -f "$_SH_TMP"; OK "starship installed"
+    else
+        rm -f "$_SH_TMP"; WARN "starship install failed — see setup.md Section 9"; FAILED_STEPS+=("starship install")
+    fi
 fi
+unset _SH_TMP
 
-# Install repo .bashrc (custom aliases: fresh, batt80/100/stat) — idempotent
-STEP "Installing .bashrc (aliases: fresh, batt80/100/stat)"
-if grep -q '^alias fresh=' "$HOME_DIR/.bashrc" 2>/dev/null; then
+# Install repo .bashrc (custom aliases: rest, batt80/100/stat) — idempotent
+STEP "Installing .bashrc (aliases: rest, batt80/100/stat)"
+if [ -f "$HOME_DIR/.bashrc" ] && cmp -s "$COMMON_DIR/.bashrc" "$HOME_DIR/.bashrc"; then
     OK ".bashrc aliases already present"
-elif [ -f "$REPO/.bashrc" ]; then
-    cp -b "$REPO/.bashrc" "$HOME_DIR/.bashrc"
+elif [ -f "$COMMON_DIR/.bashrc" ]; then
+    cp -b "$COMMON_DIR/.bashrc" "$HOME_DIR/.bashrc"
     OK ".bashrc installed (backup: .bashrc~)"
 else
-    WARN "$REPO/.bashrc missing — aliases skipped"
+    WARN "$COMMON_DIR/.bashrc missing — aliases skipped"
 fi
 
 # Hook starship into bash (idempotent)
@@ -107,35 +135,53 @@ else
     OK "starship hook already in .bashrc"
 fi
 
-# Distro-specific `fresh` alias — rewrite the alias line in place (idempotent)
-STEP "Setting distro-specific fresh alias ($DISTRO)"
+# Distro-specific `rest` alias — rewrite the alias line in place (idempotent)
+STEP "Setting distro-specific rest alias ($DISTRO)"
 if [ "$DISTRO" = "opensuse" ]; then
-    _FRESH_LINE="alias fresh='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager' # distro-fresh-alias"
+    _REST_LINE="alias rest='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager' # distro-fresh-alias"
 else
-    _FRESH_LINE="alias fresh='(sudo systemctl restart zramswap 2>/dev/null || sudo systemctl restart zram-config) && sudo systemctl restart lightdm' # distro-fresh-alias"
+    _REST_LINE="alias rest='(sudo systemctl restart zramswap 2>/dev/null || sudo systemctl restart zram-config) && sudo systemctl restart lightdm' # distro-fresh-alias"
 fi
 if [ -f "$HOME_DIR/.bashrc" ]; then
-    if grep -qF "$_FRESH_LINE" "$HOME_DIR/.bashrc" 2>/dev/null; then
-        OK "fresh alias already correct for $DISTRO"
+    if grep -qF "$_REST_LINE" "$HOME_DIR/.bashrc" 2>/dev/null; then
+        OK "rest alias already correct for $DISTRO"
     else
-        sed -i '/# distro-fresh-alias/d; /^alias fresh=/d' "$HOME_DIR/.bashrc"
-        echo "$_FRESH_LINE" >> "$HOME_DIR/.bashrc"
-        OK "fresh alias set for $DISTRO"
+        sed -i '/# distro-fresh-alias$/d' "$HOME_DIR/.bashrc"
+        echo "$_REST_LINE" >> "$HOME_DIR/.bashrc"
+        OK "rest alias set for $DISTRO"
     fi
 else
-    WARN "$HOME_DIR/.bashrc missing — fresh alias skipped"
+    WARN "$HOME_DIR/.bashrc missing — rest alias skipped"
 fi
-unset _FRESH_LINE
+unset _REST_LINE
 
 # ------------------------------------------------
 # 3. Dotfiles, themes, icons, fonts
 # ------------------------------------------------
-STEP "Copying dotfiles, themes, icons, fonts"
+STEP "Copying dotfiles, themes, fonts (icon theme installed separately — see setup.md §3)"
 mkdir -p "$HOME_DIR/.config" "$HOME_DIR/.local/share/fonts" "$HOME_DIR/.themes" "$HOME_DIR/.icons"
 # -b: back up any pre-existing file as <name>~
-[ -d "$REPO/.config" ] && cp -rb "$REPO/.config/." "$HOME_DIR/.config/" || WARN "$REPO/.config missing — skipped"
-[ -d "$REPO/.themes" ] && cp -rb "$REPO/.themes/." "$HOME_DIR/.themes/" || WARN "$REPO/.themes missing — skipped"
-[ -d "$REPO/.icons" ] && cp -rb "$REPO/.icons/." "$HOME_DIR/.icons/" || WARN "$REPO/.icons missing — skipped"
+# Shared config first; DE-specific files below win on any conflict.
+if [ -d "$COMMON_DIR/.config" ]; then
+    mkdir -p "$HOME_DIR/.config"
+    cp -rb "$COMMON_DIR/.config/." "$HOME_DIR/.config/"
+    OK "shared config applied from common/"
+else
+    WARN "common/.config missing — shared dotfiles skipped"
+fi
+if [ -d "$REPO/.config" ]; then
+    cp -rb "$REPO/.config/." "$HOME_DIR/.config/" || WARN "xfce .config copy failed"
+else
+    WARN "$REPO/.config missing — skipped"
+fi
+if [ -d "$REPO/.themes" ]; then
+    cp -rb "$REPO/.themes/." "$HOME_DIR/.themes/" || WARN "themes copy failed"
+else
+    WARN "$REPO/.themes missing — skipped"
+fi
+# .icons is intentionally NOT vendored — the WhiteSur theme is ~187MB / 43k files and
+# was dropped from the repo to keep clones small. Install it from upstream instead:
+# see setup.md Section 0. Nothing to copy here.
 [ -d "$REPO/.local/share/fonts" ] && cp -rb "$REPO/.local/share/fonts/." "$HOME_DIR/.local/share/fonts/" || WARN "fonts missing — skipped"
 fc-cache -f >/dev/null 2>&1
 OK "dotfiles + fonts applied (backups: <file>~)"
@@ -151,9 +197,15 @@ else
 
 # 1. Dynamically grab the first connected display identifier
 DISPLAY_NAME=$(xrandr --current | grep " connected" | awk '{print $1}' | head -n 1)
+if [ -z "$DISPLAY_NAME" ]; then
+    echo "no display found" >&2
+    exit 1
+fi
 
 # 2. File used to track whether dimming is currently active
-STATE_FILE="/tmp/.screen_dim_toggle_state"
+# $XDG_RUNTIME_DIR is per-user and mode 0700, whereas a fixed name in /tmp is
+# world-writable and can be pre-created by any other local user.
+STATE_FILE="${XDG_RUNTIME_DIR:-/tmp}/.screen_dim_toggle_state"
 
 # 3. Toggle brightness between 1.0 (default) and 0.6 (ultra-dim)
 if [ -f "$STATE_FILE" ]; then
@@ -361,6 +413,7 @@ elif dkms status 2>/dev/null | grep -q "^mt7902-wifi/"; then
 else
     if { if [ "$DISTRO" = "opensuse" ]; then pkg_in gcc make kernel-default-devel dkms >/dev/null 2>&1; \
         else pkg_in build-essential "linux-headers-$(uname -r)" dkms >/dev/null 2>&1; fi; } \
+        && sudo rm -rf /usr/src/mt7902-wifi-1.0 /usr/src/mt7902-bt-1.0 \
         && sudo cp -r "$REPO/drivers/mt7902/mt7902-wifi" /usr/src/mt7902-wifi-1.0 \
         && sudo cp -r "$REPO/drivers/mt7902/mt7902-bt" /usr/src/mt7902-bt-1.0 \
         && sudo dkms install -m mt7902-wifi -v 1.0 >/dev/null 2>&1 \
@@ -436,4 +489,7 @@ if [ -t 0 ]; then
 else
     echo "Non-interactive shell — restart skipped (run manually)."
 fi
+# The step-collector pattern is fine, but the exit code must reflect it or a
+# wrapper/CI sees success on a run where every step failed.
+[ "${#FAILED_STEPS[@]}" -gt 0 ] && exit 1
 exit 0

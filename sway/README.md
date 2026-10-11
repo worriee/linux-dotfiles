@@ -1,5 +1,13 @@
 # sway session backup (mirror-exact)
 
+> **ARCHIVED — sway was removed from the live system.** Retained for reference only.
+> None of its packages are installed: `rpm -q sway` → not installed, and `swaylock`,
+> `swayidle`, `waybar`, `wofi`, `mako`, `grim`, `slurp`, `brightnessctl`, `playerctl`,
+> `swaynag` and `swaymsg` are all absent. COSMIC DE is the current daily driver.
+> The package versions pinned below are a record of what was installed on
+> **2026-09-30**, not of the current machine. Do not follow the install command
+> without first reading the COSMIC and GNOME guides.
+
 Live paths mirrored 1:1 under this folder. Restore: copy back to `$HOME`
 preserving exec bit on `.local/bin/`:
 
