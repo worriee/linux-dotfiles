@@ -1,13 +1,13 @@
 # linux-dotfiles
 
-Per-desktop backup of my Linux setups, for rebuilding from scratch if a machine dies.
+Per-desktop backup of my Linux setup.
 
 - `cosmic/` — COSMIC DE on openSUSE Tumbleweed. **Daily driver.** Config only — no restore script yet.
 - `gnome/` — GNOME on openSUSE Tumbleweed. Retained as a deliberate fallback.
 - `xfce/` — XFCE on Mint/Ubuntu (apt) or openSUSE TW (zypper). XFCE-only.
 - `sway/` — **ARCHIVED.** Config backup from a removed session; none of its packages are installed.
 - `sessions/` — AI conversation transcripts from setting this repo up. History, not config.
-- `wallpapers/` — shared wallpaper assets.
+- `common/` — assets and config shared by all three desktops: shell config, Nerd Fonts, wallpaper, logo.
 
 Personal backup. No license granted — all rights reserved.
 
@@ -22,7 +22,7 @@ Personal backup. No license granted — all rights reserved.
 | `gnome/setup.md`                      | Post-install guide: kernel/ZRAM/EarlyOOM/ModemManager/Node tunings, extensions, dconf, search+index mask, autostart masks                                                 |
 | `gnome/dconf/`                        | Text dumps only (8 files): dash-to-panel, blur-my-shell panel+apps, interface, media-keys, and the wm/shell/mutter keybindings. Never the binary `~/.config/dconf/user` |
 | `gnome/extensions/list.txt`           | Enabled extensions (blur-my-shell, dash-to-panel, disable-workspace-switcher)                                                                                            |
-| `gnome/assets/jm-icon.png`            | Custom dash-to-panel app icon + fastfetch logo referenced by the dconf dump                                                                                             |
+| `common/assets/jm-icon.png`           | Custom dash-to-panel app icon + fastfetch logo referenced by the dconf dump. Copied to `~/Documents/` by every `setup.sh`                                              |
 | `xfce/setup.sh`                       | One-command restore for fresh XFCE install — per-distro branches                                                                                                       |
 | `xfce/setup.md`                       | Post-install guide: performance, storage, MT7902 + Acer drivers, keybinds, cleanup, autostart, rofi, screen dim, ZRAM                                                    |
 | `xfce/fresh-install.md`               | XFCE one-command guide (Mint / TW XFCE)                                                                                                                                  |
@@ -31,11 +31,11 @@ Personal backup. No license granted — all rights reserved.
 | `xfce/.config/rofi/`                  | Rofi Type-3 launcher (Gruvbox palette, WhiteSur icons)                                                                                                                  |
 | `xfce/.config/picom/`, `gtk-3.0/`, `autostart/` | Compositor config, panel CSS, autostart overrides (`Hidden=true` disables Mint welcome/reports)                                                             |
 | `xfce/.themes/`                       | Gruvbox XFCE window themes (BL-LB-Dark-Soft + hdpi/xhdpi)                                                                                                             |
-| `xfce/.local/share/fonts/`            | Shared Nerd fonts (JetBrains Mono etc.)                                                                                                                                  |
+| `common/.local/share/fonts/`          | Shared Nerd fonts (JetBrains Mono etc.). Every `setup.sh` copies these — kitty/fastfetch/starship need them on any DE                                                      |
 | `sway/.config/{sway,waybar,mako,wofi}/` | Archived sway compositor + bar + notification config                                                                                                                 |
 | `sway/.local/bin/`                    | Archived sway helper scripts (shot, wifi-menu, power-menu, launcher)                                                                                                    |
 | `sessions/`                           | AI conversation transcripts (13 files, ~3.6MB) — setup history, not config                                                                                            |
-| `wallpapers/bg1.jpg`                  | Shared wallpaper                                                                                                                                                         |
+| `common/wallpapers/bg1.jpg`           | Shared wallpaper. Every `setup.sh` copies it to `~/wallpapers/`; the COSMIC config and the XFCE slick-greeter both point at that copy                                           |
 | `opencode.json`, `.opencode/`         | Agent workspace config, rules, memory, skills                                                                                                                           |
 | `AGENTS.md`                           | Agent workspace instructions                                                                                                                                              |
 

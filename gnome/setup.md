@@ -1,6 +1,6 @@
 # openSUSE GNOME Post-Install System Optimizations (GNOME-only)
 
-Seven performance, storage and service optimizations for openSUSE Tumbleweed GNOME on laptops with SSDs and 8GB–16GB RAM, tuned for a coding-heavy workflow (Zed, opencode, Node, Kitty). GNOME-only — does not apply to other desktops.
+Five performance, storage and service optimizations for openSUSE Tumbleweed GNOME on laptops with SSDs and 8GB–16GB RAM, tuned for a coding-heavy workflow (Zed, opencode, Node, Kitty). GNOME-only — does not apply to other desktops.
 
 Run in this order after a fresh install.
 
@@ -10,8 +10,8 @@ Run in this order after a fresh install.
 
 - GNOME-only: this repo automates GNOME customizations. Other desktops are not supported; `setup.sh` aborts off-GNOME.
 - openSUSE Tumbleweed GNOME (zypper): full flow — `zram-generator` (`/etc/systemd/zram-generator.conf`), `/etc/sysconfig/earlyoom`, GDM via `display-manager`, bootloader untouched, btrfs root with snapper `pre-dotfiles` snapshot.
-- No Mint/Ubuntu path in this repo. For XFCE/Mint see `xfce-setup/`.
-- Fonts are not vendored here (already in `xfce-setup/.local/share/fonts/`). No `~/.local/share/gnome-shell/extensions/*` dirs vendored, no `/home/julry/.config/dconf/user` binary — text `dconf/` dumps only.
+- No Mint/Ubuntu path in this repo. For XFCE/Mint see `xfce/`.
+- Fonts are not vendored here (they live in `common/.local/share/fonts/` and `setup.sh` copies them). No `~/.local/share/gnome-shell/extensions/*` dirs vendored, no `/home/julry/.config/dconf/user` binary — text `dconf/` dumps only.
 
 ---
 
@@ -139,11 +139,12 @@ Caps the V8 JavaScript heap at **1536MB** so opencode sessions and npm builds de
 #### Step-by-Step
 
 ```bash
-# Append the Node.js memory ceiling parameter to your user shell configuration
-echo 'export NODE_OPTIONS="--max-old-space-size=1536"' >> ~/.bashrc
+# Do NOT append to ~/.bashrc here. `setup.sh` copies common/.bashrc wholesale and it
+# already carries the Node ceiling — appending by hand duplicates the line on every run.
+cp "$REPO/../common/.bashrc" ~/.bashrc
 ```
 
-Verify: `source ~/.bashrc && echo $NODE_OPTIONS` → `--max-old-space-size=1536`.
+Verify: `grep NODE_OPTIONS ~/.bashrc` → one line, `--max-old-space-size=1536`.
 
 ---
 
@@ -153,7 +154,7 @@ Both entries below are **laptop-specific extras** — this section documents why
 
 ### 2A. MT7902 Wi-Fi + Bluetooth — DEPRECATED (in-kernel driver active)
 
-MediaTek MT7902 (`14c3:7902` at `0000:02:00.0`) previously needed the out-of-tree `mt7902e`/`btusb_mt7902` DKMS drivers (vendored under `xfce-setup/drivers/mt7902/`).
+MediaTek MT7902 (`14c3:7902` at `0000:02:00.0`) previously needed the out-of-tree `mt7902e`/`btusb_mt7902` DKMS drivers (vendored under `xfce/drivers/mt7902/`).
 
 Deprecated on this machine: kernel `7.2.4-1-default` already drives the card via in-kernel `mt7921e` (`lsmod` shows `mt7921e` loaded). `setup.sh` detects the PCI ID but skips the DKMS install and logs the deprecation. Do not install the vendored driver while `mt7921e` is active.
 
@@ -165,7 +166,7 @@ Vendor is Acer, but the `acer-wmi-battery` 80% charge-limit driver is intentiona
 
 ---
 
-## 3. GNOME Shell Extensions (dash-to-panel only)
+## 3. GNOME Shell Extensions (3 enabled)
 
 Kept set (3 IDs, in `extensions/list.txt`):
 
@@ -235,14 +236,14 @@ Source dump: `dconf/wm-keybindings.dconf` → path `/org/gnome/desktop/wm/keybin
 ### How to Restore on New Laptop
 
 ```bash
-REPO=/home/julry/vscodefiles/linux-configs/gnome-setup
+REPO="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"   # or: REPO=/path/to/linux-dotfiles/gnome
 dconf load /org/gnome/settings-daemon/plugins/media-keys/ < "$REPO/dconf/media-keys.dconf"
 dconf load /org/gnome/desktop/wm/keybindings/ < "$REPO/dconf/wm-keybindings.dconf"
 dconf load /org/gnome/shell/keybindings/ < "$REPO/dconf/shell-keybindings.dconf"
 dconf load /org/gnome/mutter/keybindings/ < "$REPO/dconf/mutter-keybindings.dconf"
 ```
 
-Or use `gnome-setup/setup.sh` Section 4 loop — it loads all four automatically.
+Or use `gnome/setup.sh` Section 4 loop — it loads all four automatically.
 
 ---
 
@@ -329,7 +330,7 @@ Bluetooth stays enabled by policy — `setup.sh` never touches it.
 Text dumps only (no `~/.config/dconf/user` binary):
 
 ```bash
-REPO=/home/julry/vscodefiles/linux-configs/gnome-setup
+REPO="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"   # or: REPO=/path/to/linux-dotfiles/gnome
 dconf load /org/gnome/shell/extensions/dash-to-panel/ < "$REPO/dconf/dash-to-panel.dconf"
 dconf load /org/gnome/shell/extensions/blur-my-shell/panel/ < "$REPO/dconf/blur-my-shell-panel.dconf"
 dconf load /org/gnome/shell/extensions/blur-my-shell/applications/ < "$REPO/dconf/blur-my-shell-applications.dconf"
@@ -356,7 +357,7 @@ sudo snapper create -d "pre-dotfiles $(date +%Y-%m-%d)"
 
 Same Kitty/Starship stack as XFCE side. Files ship in repo (`.config/kitty/kitty.conf`, `.config/kitty/current-theme.conf`, `.config/starship.toml`); `setup.sh` copies them with `cp -rb`.
 
-Font note: JetBrains Mono comes from `xfce-setup/.local/share/fonts/` — not duplicated here. Install that set first on a fresh machine, then `fc-cache -f`.
+Font note: JetBrains Mono comes from `common/.local/share/fonts/` — `setup.sh` copies that tree and runs `fc-cache -f`, so nothing needs installing by hand on a fresh machine.
 
 Starship hook + `NODE_OPTIONS` + `fresh` alias land in `~/.bashrc` (idempotent `grep -q` guards in `setup.sh`).
 
@@ -472,7 +473,14 @@ Keep links 1–4 intact and the distro boots with Secure Boot enabled. Break any
 
 Scope: `setup.sh` deliberately never touches the bootloader (see its "bootloader untouched (by design)" messages). This section is **maintenance you run by hand**, and every step follows the same shape: **verify first → install only what is missing → then implement.**
 
-Verified live state on this machine at time of writing: Secure Boot `enabled (user)`, `BootCurrent: 0000` → `\EFI\systemd\shim.efi`, `Boot0001` Windows Boot Manager preserved, one enrolled MOK (`openSUSE Secure Boot CA`), `shim` 16.1-4.2, `systemd-boot` 261.2-1.2, `sdbootutil` 1+git20260909, `kernel-default` 7.2.5-1.1 + 7.2.6-1.1, BIOS V1.28, `fwupdmgr` reports no firmware updates.
+Verified live state on this machine at time of writing (October 12, 2026): Secure Boot `enabled (user)`, `BootCurrent: 0000` → `\EFI\systemd\shim.efi`, `Boot0001` Windows Boot Manager preserved, one enrolled MOK (`openSUSE Secure Boot CA`), `shim` 16.1-4.2, `systemd-boot` 261.2-1.2, `sdbootutil` 1+git20260909, running kernel `7.2.9-1-default` with `7.2.8-1-default` present in `/lib/modules/`, BIOS V1.28, `fwupdmgr` reports no firmware updates.
+
+**Tumbleweed moves every few days — re-verify before following any command below.** The version numbers in this section are examples, not state. Always read the live set first:
+
+```bash
+uname -r                       # kernel you must NOT remove
+ls /lib/modules/               # every kernel actually installed
+```
 
 ### 12.1 Packages — verify, install only if missing
 
@@ -635,8 +643,10 @@ _(Expected: `df` well under 100% used, `kernel-install list` showing at least tw
 ### 13.2 Implement — reclaim space
 
 ```bash
-# 1. Remove an old kernel, keeping the running one plus one fallback
-sudo kernel-install remove 7.2.5-1-default
+# 1. List what is installed, then remove an OLD one — never the running kernel
+ls /lib/modules/
+uname -r                                  # the one you must keep
+sudo kernel-install remove <old-version>  # e.g. 7.2.8-1-default, NOT $(uname -r)
 
 # 2. Drop boot entries whose kernels no longer exist
 sudo sdbootutil cleanup
@@ -656,7 +666,7 @@ _(Expected: free space climbs back up, the running kernel's entry is untouched, 
 ### 13.3 Rules and caveats
 
 - **Never remove the running kernel.** `uname -r` first; if the version matches, pick an older one.
-- **Keep two kernels minimum** — the running one plus `7.2.5` as a fallback, so a bad update still has somewhere to land (the same 16 snapshots are an independent net; kernel removal does not touch them).
+- **Keep two kernels minimum** — the running one plus one older fallback so a bad update still has somewhere to land (the Snapper snapshots are an independent net; kernel removal does not touch them). On this machine that is `7.2.9-1-default` running with `7.2.8-1-default` as the fallback — re-read `ls /lib/modules/` rather than trusting these numbers.
 - Only reclaim when the ESP is actually tight. Removing a kernel you might want is worse than a slightly full partition.
 - `sdbootutil cleanup` is entry bookkeeping; `bootctl garbage-collect` is the one that reclaims blocks. Both are safe to re-run.
 

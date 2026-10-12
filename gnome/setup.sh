@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # setup.sh — One-command restore of this dotfiles repo onto a fresh openSUSE GNOME install (GNOME-only).
-# Run from inside the cloned repo:  bash gnome-setup/setup.sh
-# Full instructions: gnome-setup/setup.md
+# Run from inside the cloned repo:  bash gnome/setup.sh
+# Full instructions: gnome/setup.md
 
 set -u
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../common" 2>/dev/null && pwd)"
 HOME_DIR="${HOME}"
 OK()   { printf '  \033[32m[ok]\033[0m %s\n' "$*"; }
@@ -43,8 +43,8 @@ case "${XDG_CURRENT_DESKTOP:-}" in
         ;;
 esac
 
-pkg_in() { # pkg_in <pkgs...> — install packages via zypper
-    sudo zypper -n in "$@"
+pkg_in() { # pkg_in <pkgs...> — refresh metadata once, then install
+    sudo zypper -n ref && sudo zypper -n in "$@"
 }
 
 echo "==============================================="
@@ -59,7 +59,7 @@ echo "==============================================="
 # ------------------------------------------------
 STEP "Fixing hardcoded paths (/home/julry -> $HOME_DIR)"
 _PATH_FILES=()
-for _f in "$COMMON_DIR/.config/opencode/opencode.jsonc" "$COMMON_DIR/.bashrc" "$REPO/dconf/dash-to-panel.dconf"; do
+for _f in "$COMMON_DIR/.config/opencode/opencode.jsonc" "$COMMON_DIR/.config/fastfetch/config.jsonc" "$COMMON_DIR/.bashrc" "$REPO/dconf/dash-to-panel.dconf"; do
     [ -f "$_f" ] && _PATH_FILES+=("$_f")
 done
 if [ "$HOME_DIR" = "/home/julry" ]; then
@@ -86,13 +86,17 @@ unset _f _PATH_FILES
 # ------------------------------------------------
 # 2. Packages (sudo) — openSUSE only
 # ------------------------------------------------
+# Refresh metadata once. The per-package probe below is then a pure cache read
+# (/var/cache/zypp/raw is world-readable), so it must NOT re-run `sudo zypper` per
+# package — that re-does the full refresh and re-prompts for a password N times.
+sudo zypper -n ref >/dev/null 2>&1 || true
 STEP "Checking package availability (zypper dry-check)"
 for _pkg in fastfetch kitty earlyoom zram-generator gcc make kernel-default-devel curl gnome-extensions; do
-    if sudo zypper se -x --match-exact "$_pkg" >/dev/null 2>&1; then OK "$_pkg found"
+    if zypper se -x --match-exact "$_pkg" >/dev/null 2>&1; then OK "$_pkg found"
     else WARN "$_pkg not found in repos — install still attempted for the rest"; FAILED_STEPS+=("pkg missing: $_pkg"); fi
 done
 unset _pkg
-run_step "Installing packages" bash -c 'sudo zypper -n ref && sudo zypper -n in fastfetch kitty earlyoom zram-generator gcc make kernel-default-devel curl gnome-extensions'
+run_step "Installing packages" pkg_in fastfetch kitty earlyoom zram-generator gcc make kernel-default-devel curl gnome-extensions
 
 # Starship prompt (not in repos — official installer, skipped if present)
 STEP "Starship prompt engine"
@@ -188,21 +192,37 @@ if [ -d "$REPO/.config" ]; then
 else
     WARN "$REPO/.config missing — dotfiles skipped"; FAILED_STEPS+=("dotfiles")
 fi
-# Fonts live in xfce-setup/.local/share/fonts/ — not duplicated here.
-fc-cache -f >/dev/null 2>&1 || true
 
-# Panel app icon referenced by dconf/dash-to-panel.dconf (show-apps-icon-file)
-STEP "Panel app icon (jm-icon.png)"
-if [ -f "$REPO/assets/jm-icon.png" ]; then
+# Shared assets used by all three DEs: Nerd Fonts, the fastfetch/panel logo, wallpaper.
+# These were XFCE- and GNOME-only before; every installer needs them because every
+# installer copies common/.config, and kitty/fastfetch/starship all reference Nerd
+# Font glyphs. Copying one directory is cheaper than three divergent copies.
+STEP "Copying shared assets (fonts, logo, wallpaper)"
+if [ -d "$COMMON_DIR/.local" ]; then
+    mkdir -p "$HOME_DIR/.local/share"
+    if cp -rb "$COMMON_DIR/.local/." "$HOME_DIR/.local/"; then OK "Nerd Fonts -> $HOME_DIR/.local/share/fonts"
+    else WARN "common/.local copy failed"; FAILED_STEPS+=("fonts"); fi
+else
+    WARN "common/.local missing — Nerd Fonts skipped"
+fi
+if [ -f "$COMMON_DIR/assets/jm-icon.png" ]; then
     mkdir -p "$HOME_DIR/Documents"
-    if cp -b "$REPO/assets/jm-icon.png" "$HOME_DIR/Documents/jm-icon.png" 2>/dev/null; then
-        OK "icon -> $HOME_DIR/Documents/jm-icon.png"
+    if cp -b "$COMMON_DIR/assets/jm-icon.png" "$HOME_DIR/Documents/jm-icon.png" 2>/dev/null; then
+        OK "icon -> $HOME_DIR/Documents/jm-icon.png (dash-to-panel + fastfetch)"
     else
         WARN "icon copy failed"; FAILED_STEPS+=("panel icon")
     fi
 else
-    WARN "$REPO/assets/jm-icon.png missing — icon skipped"; FAILED_STEPS+=("panel icon missing")
+    WARN "common/assets/jm-icon.png missing — icon skipped"; FAILED_STEPS+=("panel icon missing")
 fi
+if [ -d "$COMMON_DIR/wallpapers" ]; then
+    mkdir -p "$HOME_DIR/wallpapers"
+    if cp -rb "$COMMON_DIR/wallpapers/." "$HOME_DIR/wallpapers/"; then OK "wallpaper -> $HOME_DIR/wallpapers"
+    else WARN "common/wallpapers copy failed"; FAILED_STEPS+=("wallpaper"); fi
+else
+    WARN "common/wallpapers missing — wallpaper skipped"
+fi
+fc-cache -f >/dev/null 2>&1 || true
 
 # ------------------------------------------------
 # 4. GNOME shell state (extensions + dconf + gsettings)
@@ -270,19 +290,21 @@ STEP "ZRAM compressed swap (zstd, min(ram))"
 # Post-state is asserted via zramctl — never assumed.
 if grep -q "zram-size = min(ram)" /etc/systemd/zram-generator.conf 2>/dev/null \
     && grep -q "compression-algorithm = zstd" /etc/systemd/zram-generator.conf 2>/dev/null \
-    && zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
+    && /usr/sbin/zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
     OK "zram already configured (zstd, 100% RAM, active)"
 else
     # Park the legacy script-based service if present (avoids double zram devices)
     sudo systemctl disable --now zramswap >/dev/null 2>&1 || true
     if printf '[zram0]\nzram-size = min(ram)\ncompression-algorithm = zstd\n' | sudo tee /etc/systemd/zram-generator.conf >/dev/null \
         && sudo systemctl daemon-reload >/dev/null 2>&1 \
-        && sudo systemctl enable --now systemd-zram-setup@zram0.service >/dev/null 2>&1 \
-        && sudo systemctl restart dev-zram0.swap >/dev/null 2>&1; then
-        if zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
+        && sudo systemctl enable --now systemd-zram-setup@zram0.service >/dev/null 2>&1; then
+        # No `systemctl restart dev-zram0.swap`: restarting the unit does not recreate
+        # /dev/zram0 with the new settings. A reboot is what activates them; the `rest`
+        # alias is the user's manual way to do that.
+        if /usr/sbin/zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
             OK "zram configured + active (zstd, 100% RAM, verified via zramctl)"
         else
-            WARN "zram config written but zstd not active — reboot, then check zramctl"; FAILED_STEPS+=("zram verify")
+            WARN "zram config written but not yet active — REBOOT required, then run: zramctl"; FAILED_STEPS+=("zram verify (reboot pending)")
         fi
     else
         WARN "zram config failed — see setup.md Section 11"; FAILED_STEPS+=("zram config")
@@ -357,11 +379,22 @@ fi
 
 # CUPS + Avahi off, Bluetooth kept (see setup.md Section 6)
 STEP "Disable CUPS + Avahi (keep bluetooth)"
-if sudo systemctl disable --now cups.service cups.socket avahi-daemon.service avahi-daemon.socket >/dev/null 2>&1; then
-    OK "cups + avahi disabled"
-else
-    WARN "cups/avahi disable had failures — continuing"; FAILED_STEPS+=("cups/avahi")
-fi
+# One unit per call: `systemctl disable a b c d` returns non-zero if ANY named unit
+# is absent, which on a box without Avahi reported failure for three units that
+# succeeded. Skipped units are reported, not counted as failures.
+_CUPSAV=""; _CSKIP=""
+for _u in cups.service cups.socket avahi-daemon.service avahi-daemon.socket; do
+    if systemctl list-unit-files "$_u" --no-legend 2>/dev/null | grep -q .; then
+        if sudo systemctl disable --now "$_u" >/dev/null 2>&1; then _CUPSAV="$_CUPSAV $_u"
+        else WARN "could not disable $_u"; FAILED_STEPS+=("disable $_u"); fi
+    else
+        _CSKIP="$_CSKIP $_u"
+    fi
+done
+unset _u
+[ -n "$_CUPSAV" ] && OK "cups + avahi disabled:$_CUPSAV"
+[ -n "$_CSKIP" ] && OK "not present, skipped:$_CSKIP"
+unset _CUPSAV _CSKIP
 if systemctl is-enabled bluetooth.service >/dev/null 2>&1; then
     OK "bluetooth still enabled (untouched)"
 else
@@ -431,7 +464,7 @@ command -v brave-browser >/dev/null && echo "   brave-browser : installed" \
     || echo "   brave-browser : NOT installed — install manually"
 command -v zed >/dev/null && echo "   zed           : installed" \
     || echo "   zed           : NOT installed — install manually"
-echo "   fonts         : from xfce-setup/.local/share/fonts/ (not vendored here)"
+echo "   fonts         : Nerd Fonts from common/.local/share/fonts/"
 echo "   bootloader    : untouched (by design)"
 echo
 if [ -t 0 ]; then

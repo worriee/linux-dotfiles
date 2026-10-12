@@ -9,7 +9,7 @@
 
 set -u
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../common" 2>/dev/null && pwd)"
 HOME_DIR="${HOME}"
 OK()   { printf '  \033[32m[ok]\033[0m %s\n' "$*"; }
@@ -72,7 +72,7 @@ echo "==============================================="
 # exit status with `2>/dev/null || true` and printing OK regardless.
 STEP "Fixing hardcoded paths (/home/julry -> $HOME_DIR)"
 _PATH_FILES=()
-for _f in "$COMMON_DIR/.bashrc" "$COMMON_DIR/.config/opencode/opencode.jsonc"; do
+for _f in "$COMMON_DIR/.bashrc" "$COMMON_DIR/.config/opencode/opencode.jsonc" "$COMMON_DIR/.config/fastfetch/config.jsonc"; do
     [ -f "$_f" ] && _PATH_FILES+=("$_f")
 done
 if [ "$HOME_DIR" = "/home/julry" ]; then
@@ -156,19 +156,21 @@ STEP "ZRAM compressed swap (zstd, 100% RAM)"
 # Post-state is asserted via zramctl — never assumed.
 if grep -q "zram-size = min(ram)" /etc/systemd/zram-generator.conf 2>/dev/null \
     && grep -q "compression-algorithm = zstd" /etc/systemd/zram-generator.conf 2>/dev/null \
-    && zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
+    && /usr/sbin/zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
     OK "zram already configured (zstd, 100% RAM, active)"
 else
     # Park the legacy script-based service if present (avoids double zram devices)
     sudo systemctl disable --now zramswap >/dev/null 2>&1 || true
     if printf '[zram0]\nzram-size = min(ram)\ncompression-algorithm = zstd\n' | sudo tee /etc/systemd/zram-generator.conf >/dev/null \
         && sudo systemctl daemon-reload >/dev/null 2>&1 \
-        && sudo systemctl enable --now systemd-zram-setup@zram0.service >/dev/null 2>&1 \
-        && sudo systemctl restart dev-zram0.swap >/dev/null 2>&1; then
-        if zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
+        && sudo systemctl enable --now systemd-zram-setup@zram0.service >/dev/null 2>&1; then
+        # No `systemctl restart dev-zram0.swap`: restarting the unit does not recreate
+        # /dev/zram0 with the new settings. A reboot is what activates them; the `rest`
+        # alias is the user's manual way to do that.
+        if /usr/sbin/zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
             OK "zram configured + active (zstd, 100% RAM, verified via zramctl)"
         else
-            WARN "zram config written but zstd not active — reboot, then check zramctl"; FAILED_STEPS+=("zram verify")
+            WARN "zram config written but not yet active — REBOOT required, then run: zramctl"; FAILED_STEPS+=("zram verify (reboot pending)")
         fi
     else
         WARN "zram config failed — see setup.md Section 1"; FAILED_STEPS+=("zram config")
@@ -221,6 +223,36 @@ if [ -d "$COMMON_DIR/.config" ]; then
         || { WARN "common/.config copy failed"; FAILED_STEPS+=("common config"); }
 else
     WARN "common/.config missing — shared dotfiles skipped"
+fi
+
+# Shared assets used by all three DEs (see the same block in gnome/setup.sh for why
+# these are not GNOME- or XFCE-only): Nerd Fonts, the fastfetch logo, the wallpaper.
+# The COSMIC config restored in step 6 points at $HOME/wallpapers/bg1.jpg, so without
+# this the restored desktop comes up on a flat background.
+STEP "Copying shared assets (fonts, logo, wallpaper)"
+if [ -d "$COMMON_DIR/.local" ]; then
+    mkdir -p "$HOME_DIR/.local/share"
+    if cp -rb "$COMMON_DIR/.local/." "$HOME_DIR/.local/"; then OK "Nerd Fonts -> $HOME_DIR/.local/share/fonts"
+    else WARN "common/.local copy failed"; FAILED_STEPS+=("fonts"); fi
+else
+    WARN "common/.local missing — Nerd Fonts skipped"
+fi
+if [ -f "$COMMON_DIR/assets/jm-icon.png" ]; then
+    mkdir -p "$HOME_DIR/Documents"
+    if cp -b "$COMMON_DIR/assets/jm-icon.png" "$HOME_DIR/Documents/jm-icon.png" 2>/dev/null; then
+        OK "icon -> $HOME_DIR/Documents/jm-icon.png (fastfetch)"
+    else
+        WARN "icon copy failed"; FAILED_STEPS+=("fastfetch logo")
+    fi
+else
+    WARN "common/assets/jm-icon.png missing — fastfetch logo skipped"; FAILED_STEPS+=("logo missing")
+fi
+if [ -d "$COMMON_DIR/wallpapers" ]; then
+    mkdir -p "$HOME_DIR/wallpapers"
+    if cp -rb "$COMMON_DIR/wallpapers/." "$HOME_DIR/wallpapers/"; then OK "wallpaper -> $HOME_DIR/wallpapers"
+    else WARN "common/wallpapers copy failed"; FAILED_STEPS+=("wallpaper"); fi
+else
+    WARN "common/wallpapers missing — wallpaper skipped"
 fi
 
 STEP "Installing .bashrc (aliases: rest, game, code)"
@@ -397,7 +429,7 @@ command -v brave-browser >/dev/null 2>&1 && echo "   brave-browser : installed" 
 command -v zed >/dev/null 2>&1 && echo "   zed           : installed" \
     || echo "   zed           : NOT in Tumbleweed repos — see setup.md Section 12"
 echo "   display mgr   : GDM enabled, greetd disabled (cosmic-greeter installed, inactive)"
-echo "   fonts         : not vendored here — see gnome/ or xfce/ font tree"
+echo "   fonts         : Nerd Fonts from common/.local/share/fonts/"
 echo
 if [ -t 0 ]; then
     read -rp "Restart the login screen now? (logs you out!) [y/N] " ans

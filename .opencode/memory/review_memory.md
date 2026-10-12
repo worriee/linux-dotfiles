@@ -2,525 +2,12 @@
 
 ## 0. Last Synchronized Checkpoint
 
-- **Last AI Analysis Timestamp**: October 11, 2026, 08:35 AM PST
+- **Last AI Analysis Timestamp**: October 12, 2026, second `-r` pass — 8 new findings (REVIEW-105..112), 37 prior verified still open
+- **Prior Pass**: October 11, 2026, 08:35 AM PST — 63 findings, REVIEW-027..089
 
 ## 1. Active & Open Review Findings
 
-_Audited October 11, 2026. Entries below are genuinely unresolved. Seven findings the owner reviewed and knowingly kept are summarised in the ACCEPTED table above; five fixed findings were migrated to Section 2. Full narratives for every closed entry are preserved in Section 2._
-
-### [REVIEW-094] opencode config row claimed jsonc only; plugins unbacked
-
-- **File/Path**: `README.md:37`
-- **Severity**: HIGH
-- **Category**: Correctness
-- **Finding**: Row read `` (`opencode.jsonc` only) `` while the directory also held `plugins/caveman.ts`, `plugins/rtk.ts` and `caveman/` with its skill and three commands. `grep -niE 'plugin' README.md` returned no plugin rows at all, and both opencode trees were untracked — so the documented backup was not backed by the repo.
-- **Recommendation**: Update the row to list the plugins and skill dir, and stage the untracked trees.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-094)`. Tree consolidated to `common/.config/opencode/`; still needs `git add` by the user.
-
----
-
-### [REVIEW-095] README and .bashrc disagreed on alias names and documented nonexistent aliases
-
-- **File/Path**: `common/.bashrc:135`, `gnome/setup.sh:108`, `xfce/setup.sh:114,116`
-- **Severity**: HIGH
-- **Category**: Correctness
-- **Finding**: Three-way disagreement on the same alias. The README documented a `fresh` alias plus `batt80`/`batt100`/`battstat`; `grep -c batt` returns 0, so no `batt*` alias exists anywhere. All three DE copies defined `alias rest=... # distro-fresh-alias` — `fresh` appeared only inside that trailing comment — while both installers wrote a literal `alias fresh=` and a `sed` deleted `^alias fresh=` before re-appending, so the installer fought the file it installed.
-- **Recommendation**: Pick one name and align every location.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-095)`.
-
----
-
-_Full-repo review, October 11, 2026, 08:35 AM PST. 63 findings (2 CRITICAL / 17 HIGH / 20 MEDIUM / 24 LOW), tracked REVIEW-027 through REVIEW-089. All entries active pending user decision._
-
-### [ACCEPTED] 7 findings closed by owner decision — no code change wanted
-
-Reviewed by the repository owner on October 11, 2026, 08:08 PM PST. Each is a real defect; each was knowingly kept. Full narratives are preserved in Section 2.
-
-| Finding | Issue | Decision |
-|---|---|---|
-| REVIEW-027 | `cosmic/.config/autostart/xhost-root.desktop` grants root X access at every login via `xhost +si:localuser:root`, never revoked | **Kept deliberately** — required for YaST GUI under COSMIC |
-| REVIEW-036 | sway idle-lock block is commented out while the config prose and README both claim a 900s lock | **Kept** — sway is archived and uninstalled |
-| REVIEW-037 | `sway/.local/bin/wifi-menu.sh` passes the WiFi PSK as an `nmcli` argv, visible in `ps` to every local user | **Kept** — sway is archived and uninstalled |
-| REVIEW-040 | 13 AI conversation transcripts, 3.6MB / 73,634 lines, committed to a public dotfiles repo | **Kept deliberately** — personal record of the setup journey |
-| REVIEW-057 | `xfce/setup.md:318` claims the Acer battery driver is loaded; `lsmod` shows no `acer-wmi-battery` | **Kept** — Mint/Ubuntu-era claim, not applicable to openSUSE Tumbleweed |
-| REVIEW-058 | MT7902 DKMS presented as a live install procedure while the doc itself marks it deprecated | **Kept** — in-kernel `mt7921e` works out of the box on Tumbleweed |
-| REVIEW-060 | `.opencode/workspace.json` identity fields say `linux-configs`; the repo is `linux-dotfiles` | **Deferred to owner** — `.clinerules` forbids editing identity fields unprompted |
-
----
-
-### [REVIEW-028] slick-greeter config written unconditionally to a deleted wallpaper, reports success (Severity: CRITICAL)
-
-- **Category**: Correctness
-- **File/Path**: `xfce/setup.sh:175-194`
-- **The Issue**: Line 175 detects missing `xfce/background.jpg` and warns, but the config write at 181 runs unconditionally, and line 194 prints `OK` unconditionally. `xfce/background.jpg` does not exist at HEAD (deleted in commit `0b970457`). A fresh XFCE install greets the user with a black login screen while the script claims success.
-- **Recommendation**: Gate the `tee` on the same flag that detects the wallpaper; drop the unconditional `OK`. `wallpapers/bg1.jpg` is tracked in-repo and can be repointed. Verified `MISSING` October 11, 2026.
-
----
-
-### [REVIEW-029] 24 sk-shaped strings in committed transcripts will hard-fail secret scanning (Severity: HIGH)
-
-- **Category**: Security
-- **File/Path**: `sessions/session-oct-6.md`, `sessions/session-oct-6-1.md`, `sessions/session-oct-8.md`, `sessions/session-oct-10.md`
-- **The Issue**: Verified individually — every `sk-[A-Za-z0-9]{20,}` match is concatenated SVG attribute dump noise (`mask-image`, `mask-composite`, `mask-origin`). **False positives, no credential exists.** The repo is public and the byte shape is identical to a live OpenAI key, so GitHub push protection and any scanner will reject pushes.
-- **Recommendation**: Add `.gitattributes` with `sessions/* -diff`; remove `sessions/` from git entirely per REVIEW-041.
-
----
-
-### [REVIEW-030] `.bashrc` install guard blocks every future repo update
-
-- **File/Path**: `gnome/setup.sh:88-95`, `xfce/setup.sh:93-100`
-- **Severity**: HIGH
-- **Category**: Correctness
-- **Finding**: The idempotency guard tested a marker string — `if grep -q '^alias fresh=' "$HOME_DIR/.bashrc"` — instead of comparing content. First run appended the marker; every later run skipped the `cp` forever, so later `.bashrc` edits silently never landed.
-- **Recommendation**: Gate on a content comparison, not a marker string.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-030, 031, 033)`.
-
----
-
-### [REVIEW-031] Unpinned remote script piped into a shell, `curl` missing `-f`
-
-- **File/Path**: `gnome/setup.sh:82`, `xfce/setup.sh:87`
-- **Severity**: HIGH
-- **Category**: Security
-- **Finding**: `curl -sS https://starship.rs/install.sh | sh -s -- -y` — no version pin, no checksum. `-sS` without `-f` means an HTTP error body is piped into `sh` and the script still prints `OK`.
-- **Recommendation**: `curl -fsSL -o` to a temp file, then `sh` it.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-030, 031, 033)`.
-
----
-
-### [REVIEW-032] Unpinned third-party kernel module built and modprobed as root from a fixed `/tmp` path (Severity: HIGH)
-
-- **Category**: Security
-- **File/Path**: `xfce/setup.sh:381-392`
-- **The Issue**: `git clone --depth=1` of an unpinned branch → `make` → `cp` the `.ko` into `/lib/modules/$(uname -r)` → `depmod` → `sudo modprobe`. Ring-0 code from a moving remote ref into a predictable world-writable `/tmp` path. Re-run fails (directory exists, no cleanup before clone) and the `rm -rf` is success-path only.
-- **Recommendation**: Clone into `$(mktemp -d)`, pin a commit SHA, `trap` cleanup on all exit paths.
-
----
-
-### [REVIEW-033] Nonexistent directory prepended to PATH permanently
-
-- **File/Path**: `common/.bashrc:123` (was duplicated in all three DE copies)
-- **Severity**: HIGH
-- **Category**: Security
-- **Finding**: `export PATH="/home/julry/.opencode/bin:$PATH"` — that directory does not exist. Every interactive shell started with a nonexistent directory at the FRONT of PATH; on any account, a `/home/julry/.opencode/bin` another user can create becomes a binary-hijack vector. Line 124 of the same file already did it correctly with `$HOME/.local/bin`.
-- **Recommendation**: Delete the line.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-030, 031, 033)`.
-
----
-
-### [REVIEW-035] `A && B || C` misreports copy failure
-
-- **File/Path**: `xfce/setup.sh:136-139`
-- **Severity**: HIGH
-- **Category**: Correctness
-- **Finding**: `[ -d src ] && cp -rb src/. dest/ || WARN "src missing"` — the `||` binds to the whole `&&` chain, so a failed `cp` printed "missing" and sent the user to the wrong place. The 187MB icon recopy half of this finding became moot when `xfce/.icons/` was deleted on October 11, 2026.
-- **Recommendation**: `if/else` instead of `&& ||`.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-035)`. The fonts line in the same block was not converted; see REVIEW-060.
-
----
-
-### [REVIEW-039] 43,797 tracked files / 187MB / no root `.gitignore` (Severity: HIGH)
-
-- **Category**: Maintainability
-- **File/Path**: `xfce/.icons/` (43,099 files), missing `/.gitignore`
-- **The Issue**: `xfce/.icons/` is 187MB across 43,099 files — 98.5% of every tracked file, in a repo whose real config is ~60 files. Working tree 205MB, `.git` 44MB with 5.38 MiB orphaned garbage from an aborted gc. No root `.gitignore` exists (only `.opencode/.gitignore` and two inside `xfce/drivers/`). `xfce/fresh-install.md:130` instructs `git add -A`, which will sweep in the `*.log`, `*.bak` and `*~` files both installers create via `cp -b`.
-- **Recommendation**: Root `.gitignore` for `sessions/`, `*.log`, `*.bak`, `*~`, `.cache/`. Do NOT silently ignore `xfce/.icons/` — dropping 43k tracked files is a history rewrite and needs a deliberate decision. Then `git gc --prune=now`.
-
----
-
-### [REVIEW-043] Restore snippets point at a deleted tree (Severity: HIGH)
-
-- **Category**: Correctness
-- **File/Path**: `gnome/setup.md:238,332`, `xfce/setup.md:776`
-- **The Issue**: `REPO=/home/julry/vscodefiles/linux-configs/gnome-setup` — the entire `/home/julry/vscodefiles` tree is gone (verified). Live path is `/home/julry/repo/linux-dotfiles`. The directory moved AND was renamed; every command in these blocks fails.
-- **Recommendation**: `REPO="$(git rev-parse --show-toplevel)/gnome"` — derived, never hardcoded again.
-
----
-
-### [REVIEW-046] Screen-dim toggle uses a fixed, pre-creatable `/tmp` state file
-
-- **File/Path**: `xfce/setup.sh:149-168`
-- **Severity**: MEDIUM
-- **Category**: Security
-- **Finding**: `STATE_FILE="/tmp/.screen_dim_toggle_state"` was a predictable world-writable name. Any other local user could pre-create it, forcing the victim's first toggle into the wrong brightness branch; `rm -f` then failed silently on a file it did not own. `DISPLAY_NAME` was also unguarded — no match produced `xrandr --output ""` with no error path.
-- **Recommendation**: Use `$XDG_RUNTIME_DIR`; guard the display lookup with an explicit exit 1.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-046, 047)`.
-
----
-
-### [REVIEW-047] DKMS source copy is not idempotent — second run nests the directory
-
-- **File/Path**: `xfce/setup.sh:364-368`
-- **Severity**: MEDIUM
-- **Category**: Correctness
-- **Finding**: `cp -r "$REPO/drivers/mt7902/mt7902-wifi" /usr/src/mt7902-wifi-1.0` copies INTO the destination when it already exists, yielding `/usr/src/mt7902-wifi-1.0/mt7902-wifi/…`; `dkms install` and `make install_fw` then fail. Every other step in this script advertises idempotency — this one did not.
-- **Recommendation**: `sudo rm -rf` the destinations first, or use `cp -rT`.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-046, 047)`.
-
----
-
-### [REVIEW-048] `exit 0` returned even when every step failed
-
-- **File/Path**: `gnome/setup.sh:419`, `xfce/setup.sh:450`
-- **Severity**: MEDIUM
-- **Category**: Testability
-- **Finding**: Both scripts ended `exit 0` regardless of `${#FAILED_STEPS[@]}`. A CI job, wrapper, or `set -e` parent saw success on a run where zram, dconf, packages, and drivers all failed.
-- **Recommendation**: `exit 1` when failures exist, `exit 0` otherwise.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-048, 049)`.
-
----
-
-### [REVIEW-049] Path-rewrite `sed` swallows its own errors
-
-- **File/Path**: `gnome/setup.sh:60-64`, `xfce/setup.sh:62-66`
-- **Severity**: MEDIUM
-- **Category**: Maintainability
-- **Finding**: `sed -i "s|/home/julry|$HOME_DIR|g" … 2>/dev/null || true` followed by an unconditional `OK "paths rewritten"`. The `|| true` hid every "can't read file" error, so the OK printed even when all targets were missing. It also rewrote files inside the clone, leaving `git status` permanently dirty.
-- **Recommendation**: Verify the replacement landed before printing `OK`.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-048, 049)`. The in-place mutation of the clone is inherited house pattern and remains, logged in `cosmic/setup.md` §12.
-
----
-
-### [REVIEW-050] Three byte-identical `.bashrc` copies maintained independently
-
-- **File/Path**: `cosmic/.bashrc`, `gnome/.bashrc`, `xfce/.bashrc`
-- **Severity**: MEDIUM
-- **Category**: Maintainability
-- **Finding**: All three were git blob `6e6f15cc` — byte-identical, zero divergence. Three independent copies of one file with no DE-specific differences, so every future edit had to land three times. `cosmic/` had no `setup.sh` at all, so its copy was never even installed.
-- **Recommendation**: One `.bashrc` shared by all DEs.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-050, 051, 052, 105)`.
-
----
-
-### [REVIEW-051] Three byte-identical `fastfetch` configs, no drift check
-
-- **File/Path**: `cosmic/.config/fastfetch/config.jsonc`, `gnome/.config/fastfetch/config.jsonc`, `xfce/.config/fastfetch/config.jsonc`
-- **Severity**: MEDIUM
-- **Category**: Maintainability
-- **Finding**: All three were git blob `2bd2cf39`, identical 2688 bytes, all mode `0664`. Any edit had to be applied three times by hand with no mechanism to catch a miss. Demonstrated live on October 11, 2026 — the `os age` change had to be applied three times, and one copy silently failed on a root-owned permission error until caught.
-- **Recommendation**: One canonical file for all DEs.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-050, 051, 052, 105)`.
-
----
-
-### [REVIEW-052] Two byte-identical 21KB spotatui playlist manifests
-
-- **File/Path**: `cosmic/.config/spotatui/youtube_playlists.yml`, `gnome/.config/spotatui/youtube_playlists.yml`
-- **Severity**: MEDIUM
-- **Category**: Maintainability
-- **Finding**: 21,190 bytes each, identical, one playlist with 161 tracks. Regenerating rewrote 21KB once per DE.
-- **Recommendation**: One canonical file shared by all DEs.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-050, 051, 052, 105)`.
-
----
-
-### [REVIEW-053] 20+ hardcoded `/home/julry/...` absolute paths across configs and scripts (Severity: MEDIUM)
-
-- **Category**: Portability
-- **File/Path**: 3× `fastfetch/config.jsonc:5`, `sway/.config/sway/config:19,34,177,236,237,240,263`, `sway/.config/waybar/config:50,60,65,70`, `sway/.local/bin/shot.sh:4`, `sway/.local/bin/notif-center.sh:25`, `sway/.local/bin/power-menu.sh:11`
-- **The Issue**: The fastfetch logo points at `/home/julry/Documents/jm-icon.png`, outside the repo entirely. Sway alone carries 14 absolute references. A restore-as-documented leaves every one of them dangling for any other user or machine.
-- **Recommendation**: `~` or `$HOME` throughout; vendor the logo inside the repo so the copies stay self-contained.
-
----
-
-### [REVIEW-054] Starship prompt hardcodes the username `julry` (Severity: MEDIUM)
-
-- **Category**: Correctness
-- **File/Path**: `gnome/.config/starship.toml:5`
-- **The Issue**: `[ julry](bg:#a3aed2 fg:#090c0c)` is a literal string in `format`. Every other user of this repo gets a prompt that lies about who they are.
-- **Recommendation**: Replace the literal with starship's `$username` module, styled identically.
-
----
-
-### [REVIEW-055] Repo copies have drifted from the live home configs they mirror
-
-- **File/Path**: `gnome/.config/zed/settings.json:131`, `gnome/.config/kitty/kitty.conf:6`
-- **Severity**: MEDIUM
-- **Category**: Maintainability
-- **Finding**: Repo had `"dark": "Transparent Prism - Sunset"` while live had `"dark": "Ayu Glass Dark"`; repo had `font_size 10.0` while live had `11.0`. `starship.toml` and `zed/keymap.json` were identical. The repo claimed to be the source of truth, so restoring it would revert live settings the user had changed since.
-- **Recommendation**: Sync repo from live, or date-stamp the snapshot and mark those files non-authoritative.
-- **Status 2026-10-11**: RESOLVED — see Section 2, `(REVIEW-055)`. zed synced; kitty had already converged on its own.
-
----
-
-### [REVIEW-056] `xfce/setup.md` is Linux Mint/apt-only prose on an openSUSE repo (Severity: MEDIUM)
-
-- **Category**: Correctness
-- **File/Path**: `xfce/setup.md` (28 apt references; §1A:39, §1E:188, §4F:529, §11:1012)
-- **The Issue**: Every step after §0 is apt-only. `apt`, `dpkg`, `tune2fs`, `update-grub`, `update-alternatives`, `xrandr`, `xfconf-query` are all absent on the live box. §1A tells the reader to edit `/etc/sysctl.conf` while `xfce/setup.sh:219` writes a `/etc/sysctl.d/99-swappiness.conf` drop-in — different mechanism, different file, never mentioned.
-- **Recommendation**: Two-column Mint-vs-openSUSE, or an explicit banner at §0. Fix §1A to document the drop-in the script actually writes.
-
----
-
-### [REVIEW-059] `opencode.json` and `workspace.json` are invalid strict JSON (Severity: MEDIUM)
-
-- **Category**: Correctness
-- **File/Path**: `opencode.json:8`, `.opencode/workspace.json:9`, `xfce/.config/opencode/opencode.jsonc:7`
-- **The Issue**: Both root files end with a trailing `// c: worrie` comment; `python3 -m json.tool` fails with `Extra data`. `workspace.json` declares the opencode schema and is read by the `-init`/`-obsidian`/`-archive` handlers, so any strict-JSON tooling (jq, CI) breaks. The repo's own `.jsonc` is doubly invalid — trailing comma after `preserveSystemPrompt`.
-- **Recommendation**: Drop the comment line from both `.json` files, or rename to `.jsonc` and confirm every consumer tolerates JSONC.
-
----
-
-### [REVIEW-061] `AGENTS.md` omits `project_memory.md` and `.opencode/archives/` (Severity: MEDIUM)
-
-- **Category**: Maintainability
-- **File/Path**: `AGENTS.md:23-28`
-- **The Issue**: The "Memory File Locations" section lists `rules/` and `memory/` but never mentions `project_memory.md` — which lives in `rules/`, not `memory/`, despite being load-bearing for three flags (`-init`, `-obsidian`, `-archive`) — nor `.opencode/archives/`, which exists with 5 files and is the defined archival target.
-- **Recommendation**: Add both entries to the memory section. All 13 paths AGENTS.md does list exist — no dead paths there.
-
----
-
-### [REVIEW-062] Lock-screen autostart leaves the session unlocked for 3s and passes no session ID (Severity: MEDIUM)
-
-- **Category**: Security
-- **File/Path**: `gnome/.config/autostart/lock-screen.desktop:5`
-- **The Issue**: `Exec=sh -c 'sleep 3; /usr/bin/loginctl lock-session'`. Three problems — a 3-second interactively-usable window on every login (fatal under autologin), `loginctl lock-session` takes `[ID…]` and none is named so resolution depends on the caller, and single-quote quoting is not what the desktop-entry spec mandates (it only works because GIO uses `g_shell_parse_argv`).
-- **Recommendation**: Lock directly with `"$XDG_SESSION_ID"`, or use GNOME's own screen-shield-delay instead of sleep-then-lock.
-
----
-
-### [REVIEW-063] fastfetch configs are group-writable while git records 0644 (Severity: MEDIUM)
-
-- **Category**: Security
-- **File/Path**: 3× `fastfetch/config.jsonc`
-- **The Issue**: `-rw-rw-r-- julry:julry` on all three, while git records mode `100644`. The group-write bit is untracked local state that vanishes silently on re-clone, or gets re-applied by a stray `chmod -R g+w`. Any member of group `julry` can rewrite these files.
-- **Recommendation**: `chmod 644`; add a umask guard in setup; do not rely on untracked mode bits for security-relevant settings.
-
----
-
-### [REVIEW-064] Secure Boot section pins three different stale kernel versions as "verified live" (Severity: MEDIUM)
-
-- **Category**: Correctness
-- **File/Path**: `gnome/setup.md:158,475,639,659`
-- **The Issue**: Claims verified live state with `kernel-default` 7.2.5-1.1 + 7.2.6-1.1; line 158 says 7.2.4; line 639 gives `sudo kernel-install remove 7.2.5-1-default` for a version no longer installed; line 659 says keep 7.2.5 as fallback. Live running kernel is `7.2.9-1-default`. The "verified live" framing lends false authority to stale values.
-- **Recommendation**: Replace pinned versions with `uname -r` derivation; add a `Last verified:` marker.
-
----
-
-### [REVIEW-065] Waybar exposes 5 workspaces while sway binds 10 (Severity: MEDIUM)
-
-- **Category**: Correctness
-- **File/Path**: `sway/.config/waybar/config:11` vs `sway/.config/sway/config:125-145`
-- **The Issue**: `persistent-workspaces` maps 1–5; sway binds 1–10; `disable-scroll: true` removes the scroll fallback. Workspaces 6–10 exist but are unreachable from the bar.
-- **Recommendation**: Extend the map to 10, or drop the sway bindings for 6–10.
-
----
-
-### [REVIEW-066] `zoxide query -i` receives an unquoted multi-word selection (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `{cosmic,gnome,xfce}/.bashrc:150,184`
-- **The Issue**: `zoxide query -i "${@:2}"` and `zoxide query -i "$@"` split on spaces, so a directory like `/home/julry/repo/my project` fails; the `|| return 1` swallows it into a bare exit 1 with no message.
-- **Recommendation**: Quote both.
-
----
-
-### [REVIEW-067] `_launch_and_exit` discards all output and always reports success (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `{cosmic,gnome,xfce}/.bashrc:140-145`
-- **The Issue**: `nohup zed "$target" >/dev/null 2>&1 &` then a hardcoded `exit 0`. `zed` is not installed by either setup script — both list it under "manual leftovers" — so the launch fails, the error is thrown away, and success is still reported. The editor simply never opens.
-- **Recommendation**: `command -v zed` guard; drop `2>&1`; capture the real status.
-
----
-
-### [REVIEW-068] `fastfetch` runs on every shell opened in `$HOME` (Severity: LOW)
-
-- **Category**: Performance
-- **File/Path**: `{cosmic,gnome,xfce}/.bashrc:126-128`
-- **The Issue**: `if [ "$PWD" = "$HOME" ]; then fastfetch; fi` blocks shell startup with no guard on the binary existing and no opt-out.
-- **Recommendation**: `command -v fastfetch` guard, or gate behind a flag var.
-
----
-
-### [REVIEW-069] `zzed` dereferences `$1` before checking `$#` (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `{cosmic,gnome,xfce}/.bashrc:148,155`
-- **The Issue**: `if [ "$1" = "-i" ]` runs before `if [ $# -eq 0 ]`. Works today because `$1` expands empty, but aborts under an inherited `set -u` before the zero-arg branch is reached.
-- **Recommendation**: Move the `[ $# -eq 0 ]` block above line 148.
-
----
-
-### [REVIEW-070] `repo ref` silently no-ops when `~/repo` is absent (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `{cosmic,gnome,xfce}/.bashrc:194-200`
-- **The Issue**: `for d in "$HOME/repo"/*/` — the glob stays literal when the directory is missing, `[ -d "$d" ]` is false for every iteration, and the function returns 0 having done nothing. No diagnostic.
-- **Recommendation**: `[ -d "$HOME/repo" ] || { echo "repo: not found" >&2; return 1; }` before the loop.
-
----
-
-### [REVIEW-071] `pkg_in()` defined and never called (Severity: LOW)
-
-- **Category**: Maintainability
-- **File/Path**: `gnome/setup.sh:45-47`
-- **The Issue**: The only call sites are in `xfce/setup.sh` (306, 362, 363, 381, 382). GNOME installs packages via an inline `bash -c` string at line 75 instead — dead code plus a second divergent install path.
-- **Recommendation**: Delete it, or route line 75 through `pkg_in`.
-
----
-
-### [REVIEW-072] `sudo zypper se` inside a per-package loop (Severity: LOW)
-
-- **Category**: Performance
-- **File/Path**: `gnome/setup.sh:70-73`, `xfce/setup.sh:72-75`
-- **The Issue**: `sudo zypper se -x --match-exact "$_pkg"` runs once per package — 8 and 12 full repo-metadata refreshes plus repeated credential checks, for a purely informational dry-check.
-- **Recommendation**: One `zypper se` call for the whole list, or a single `sudo bash -c`.
-
----
-
-### [REVIEW-073] Multi-unit `systemctl disable --now` reports failure when any unit is missing (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `gnome/setup.sh:325`, `xfce/setup.sh:325`
-- **The Issue**: `systemctl disable --now cups.service cups.socket avahi-daemon.service avahi-daemon.socket` returns non-zero if ANY named unit is absent. On a system without Avahi, three units succeed and the script still emits a `WARN` plus a `FAILED_STEPS` entry — a misleading signal in the summary.
-- **Recommendation**: Iterate units individually and aggregate, or filter to installed units first.
-
----
-
-### [REVIEW-074] `REPO` resolution breaks when the script is piped or sourced from stdin (Severity: LOW)
-
-- **Category**: Portability
-- **File/Path**: `gnome/setup.sh:8`, `xfce/setup.sh:8`
-- **The Issue**: `REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"` — under `set -u`, `${BASH_SOURCE[0]}` is unset when fed via `curl … | bash` or `bash < setup.sh`, aborting with an unbound-variable error.
-- **Recommendation**: `"${BASH_SOURCE[0]:-$0}"`.
-
----
-
-### [REVIEW-075] `systemctl restart` on a swap unit cannot recreate the device (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `gnome/setup.sh:246`, `xfce/setup.sh:242`
-- **The Issue**: `systemctl restart dev-zram0.swap` restarts the unit but does not recreate `/dev/zram0` with new compression settings. The outcome depends on the user noticing the WARN and rebooting.
-- **Recommendation**: Drop the restart; the generator enable plus `zramctl` verification suffice. Say plainly that a reboot is required.
-
----
-
-### [REVIEW-076] JSON config files carry the executable bit (Severity: LOW)
-
-- **Category**: Maintainability
-- **File/Path**: `gnome/.config/zed/keymap.json` (0755), `gnome/.config/opencode/opencode.jsonc` (0755)
-- **The Issue**: `-rwxr-xr-x` on JSON configs while sibling `settings.json` is 0644; git records `keymap.json` as `100755`. No functional impact, but it hides the real mode problem in REVIEW-063 from diffs.
-- **Recommendation**: `chmod 644`; `git update-index --chmod=-x` for `keymap.json`.
-
----
-
-### [REVIEW-077] sway includes a config directory that does not exist (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `sway/.config/sway/config:258`
-- **The Issue**: `include /etc/sway/config.d/*` — `/etc/sway` exists, `/etc/sway/config.d` does not. The glob matches nothing and sway logs an include failure on every config load.
-- **Recommendation**: `mkdir -p` on install, guard the include, or delete the line.
-
----
-
-### [REVIEW-078] Waybar backlight pinned to one GPU's device name (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `sway/.config/waybar/config:31`
-- **The Issue**: `"device": "amdgpu_bl1"` — a single-machine assumption; on any other GPU the module shows nothing.
-- **Recommendation**: Remove the key so waybar picks the first backlight, or comment it as hardware-specific.
-
----
-
-### [REVIEW-079] Waybar bluetooth reports OFF in every powered state (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `sway/.config/waybar/config:53-57`
-- **The Issue**: `format`, `format-disabled`, `format-off`, `format-on`, `format-no-controller` are all `" OFF"` — only `format-connected` differs, so a powered-but-not-connected radio reads OFF.
-- **Recommendation**: Give `format-on` a real string, or delete the redundant formats.
-
----
-
-### [REVIEW-080] fastfetch key padding inconsistency and desktop-only battery module (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: 3× `fastfetch/config.jsonc:107,112`
-- **The Issue**: Every other key is space-padded to 8 columns; `"key": "packages"` is not. The `battery` module renders nothing on a desktop.
-- **Recommendation**: Pad to `"packages "`; move `battery` into a laptop-only profile.
-
----
-
-### [REVIEW-081] spotatui commits a playlist ID and the full 161-track manifest (Severity: LOW)
-
-- **Category**: Security
-- **File/Path**: `cosmic/.config/spotatui/youtube_playlists.yml:2`, `gnome/.config/spotatui/youtube_playlists.yml:2`
-- **The Issue**: Playlist ID `2npedfnskpte` plus every track title, channel, and duration. A public playlist ID is not a credential — but if the source playlist is unlisted, that ID is the only access control and it is now in git history. **No tokens or keys found anywhere in the repo (full secret scan clean).**
-- **Recommendation**: Drop the `id` field from the committed copy if the playlist is unlisted, or keep the file out of git.
-
----
-
-### [REVIEW-082] kitty.conf documents a compositor that is not installed (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `gnome/.config/kitty/kitty.conf:15-16`
-- **The Issue**: The comment `# Frosted glass transparency for picom` sits above `background_opacity 0.85`. `picom` is not installed; kitty does this natively. The comment misattributes the effect and will mislead whoever adds a compositor later.
-- **Recommendation**: Reword to `# Transparency (kitty-native, no compositor needed)`.
-
----
-
-### [REVIEW-083] sway README points at a wallpaper that is now in the repo (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `sway/README.md:59`
-- **The Issue**: Says the wallpaper is "not in repo" — `wallpapers/bg1.jpg` is now tracked (4.3MB). The live copy at `/home/julry/wallpapers/bg1.jpg` also exists, giving two copies with no statement of which is authoritative.
-- **Recommendation**: Reference the tracked `wallpapers/bg1.jpg` and state which copy is canonical.
-
----
-
-### [REVIEW-084] Setup docs append to `.bashrc` non-idempotently, contradicting their own scripts (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `gnome/setup.md:143`, `xfce/setup.md:226`
-- **The Issue**: Both docs instruct `echo 'export NODE_OPTIONS="--max-old-space-size=1536"' >> ~/.bashrc` unconditionally. Both scripts guard with `grep -q 'max-old-space-size=1536'` first. A user following the doc twice gets duplicate lines.
-- **Recommendation**: Use the same `grep -q … || echo … >>` form in the docs.
-
----
-
-### [REVIEW-085] GNOME extensions header says "dash-to-panel only" but documents three (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `gnome/setup.md:168`
-- **The Issue**: Heading reads `## 3. GNOME Shell Extensions (dash-to-panel only)`; the body at line 170 lists three IDs (blur-my-shell, dash-to-panel, disable-workspace-switcher), all matching `gnome/extensions/list.txt`. The header is a leftover contradicting its own body.
-- **Recommendation**: Change the heading to `(3 enabled IDs)`.
-
----
-
-### [REVIEW-086] Both setup docs claim "Seven optimizations"; GNOME has five (Severity: LOW)
-
-- **Category**: Maintainability
-- **File/Path**: `gnome/setup.md:3`, `xfce/setup.md:3`
-- **The Issue**: XFCE §1 has 1A–1G = 7 (accurate). GNOME §1 has 1A, 1D, 1E, 1F, 1G = 5 because openSUSE skips GRUB and ext4-reserve by design (correctly noted at line 52), but the opener was never updated.
-- **Recommendation**: Change `gnome/setup.md:3` to "Five", or state "Seven, minus GRUB and ext4 reserve which openSUSE skips".
-
----
-
-### [REVIEW-087] `xfce/setup.md` instructs copying from a nonexistent `linux-configs/.config/` tree (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `xfce/setup.md:449,608,670`
-- **The Issue**: `cp linux-configs/.config/xfce4/…` — wrong repo name AND the dotfiles live under `xfce/`, not the repo root, so correcting the name alone still leaves a nonexistent path. Each block carries an "adjust the path" hedge that papers over the bug.
-- **Recommendation**: Standardize on `REPO=/home/julry/repo/linux-dotfiles/xfce` or a derived path, then delete the hedges.
-
----
-
-### [REVIEW-088] Same launcher bound to two key combos at two hardcoded paths (Severity: LOW)
-
-- **Category**: Maintainability
-- **File/Path**: `sway/.config/sway/config:83,177`
-- **The Issue**: `bindsym $mod+d exec $menu` and `bindsym $mod+a exec /home/julry/.local/bin/launcher.sh` run the identical script at an identical hardcoded path. Two names, one behavior, two places to update.
-- **Recommendation**: Keep one binding, or point both at `$menu`.
-
----
-
-### [REVIEW-089] `/usr/sbin` binaries referenced as if on the user PATH (Severity: LOW)
-
-- **Category**: Correctness
-- **File/Path**: `xfce/fresh-install.md:105`, `xfce/setup.sh:153`, `gnome/setup.md:436`
-- **The Issue**: `zramctl`, `efibootmgr`, `update-alternatives`, `xrandr` are referenced bare but live in `/usr/sbin`. `gnome/setup.md:503` correctly flags `efibootmgr` as not on a user PATH but never flags `zramctl`, which has the identical problem, while both `setup.sh` scripts call `zramctl` bare.
-- **Recommendation**: Use the absolute path or document the PATH requirement.
-
----
+_Audited October 11, 2026; re-verified and extended October 12, 2026. **No open findings remain.** The last two (REVIEW-106 dkms, REVIEW-111 Acer battery) were closed by owner decision on October 12, 2026: both belong to the out-of-tree kernel-driver path that only applies to the Linux Mint / Ubuntu installation used on old laptops and low-power machines, not to the openSUSE Tumbleweed installation this repo now serves. Tumbleweed ships the in-kernel `mt7921e` driver for the MT7902 card, `dkms` is not installed, and Secure Boot is enabled so unsigned out-of-tree modules cannot load at all. **The code is left exactly as written — the owner has chosen a non-working script on this platform over editing core backups.** Section 2 holds 53 resolved entries and preserves the full narrative of every closed finding.
 
 _All eight reviews REVIEW-019–026 (split-layout audit, September 13, 2026) fixed the same day — migrated to Section 2._
 
@@ -531,6 +18,201 @@ _Reviews REVIEW-012–018 (TW-readiness audit, September 09, 2026) all fixed the
 ## 2. Historical & Resolved Reviews
 
 _Move reviews to this section once they are completely verified as resolved. This serves as historical memory to prevent the AI from re-introducing the same issues._
+
+_Seven entries further down were closed by owner decision rather than by a code change: each is a real defect that was reviewed and knowingly kept. They carry the original tracking number so the history stays intact, and the decision plus any compensating control is recorded so a later pass does not mistake them for unexamined bugs._
+
+### [RESOLVED] Batch G — out-of-tree kernel drivers retired from scope for the Tumbleweed platform (REVIEW-106, 111)
+
+Closed October 12, 2026 by owner decision. **No file in the repository was modified in this batch.** `xfce/setup.sh` and the `xfce/drivers/mt7902/` tree are untouched, exactly as written.
+
+- **The decision**: both findings sit in the optional-hardware section of `xfce/setup.sh` — the section that installs out-of-tree kernel modules. That path exists for the **Linux Mint / Ubuntu installation used on old laptops and low-power machines**, whose kernels predate the in-kernel MediaTek driver. It does not apply to the openSUSE Tumbleweed installation this repo now serves. The owner's instruction is explicit: **the script is allowed not to work on this platform rather than the core backups being edited.** So neither line was changed, and neither will be.
+- **REVIEW-106 — `dkms status` called unprivileged, so the idempotency guard never matches.** `xfce/setup.sh:449` runs `dkms status | grep -q "^mt7902-wifi/"`. `dkms` lives in `/usr/sbin`, which is not on this machine's user `PATH`, so the guard is always false and the DKMS branch would re-run its `sudo rm -rf /usr/src/mt7902-*` on every execution. **Unreachable on this machine for three independent reasons**: `dkms` is not installed (`rpm -q dkms` → not installed); the MT7902 at `0000:02:00.0` is already bound to the in-kernel `mt7921e` driver, which Tumbleweed ships and which works; and `xfce/setup.sh` aborts at its DE guard because the active session is COSMIC, not XFCE. The defect is real on a Mint machine with an MT7902 card and is left in place for that platform.
+- **REVIEW-111 — Acer battery driver clones an unpinned branch into a predictable `/tmp` path.** `xfce/setup.sh:474-478` runs `git clone --depth=1 https://github.com/frederik-h/acer-wmi-battery.git /tmp/acer-wmi-battery`, builds it, and copies the resulting `.ko` into `/lib/modules/$(uname -r)` with `sudo`. Three defects were recorded: the fixed world-writable `/tmp` path is pre-creatable by any local user as a symlink; the branch is unpinned so module contents vary per run; and the cleanup `rm -rf` is on the success path only. **All three apply to the Mint path and are left uncorrected here.** Two further facts make the code inert on this machine regardless: `mokutil --sb-state` reports `SecureBoot enabled` with no shim-signed MOK enrolled, so an unsigned out-of-tree `.ko` is rejected by design — the owner has confirmed Secure Boot must stay enabled and has declined the driver for that reason; and the DE guard stops the script before it reaches this block.
+- **Noted and accepted**: because the Secure Boot `modprobe` fails after the `.ko` has already been copied into the live kernel tree, `depmod -a` has already run, and `/etc/modules-load.d/acer-wmi-battery.conf` has already been written, *forcing* this block to execute on a Secure Boot machine would leave a module that cannot load armed at every subsequent boot while the script prints a success. This is recorded here as a known limitation of the Mint path rather than a live risk, since the block cannot be reached from a Tumbleweed COSMIC session. It is the reason a future pass must not "helpfully" add a Secure Boot guard — the owner has decided that path is out of scope, and the block is left byte-for-byte as backed up.
+
+**Prevention Strategy**: A finding belongs in the log only if the owner intends to act on it, and a platform boundary is as much a scoping decision as a personal preference. Both of these were correct observations about code that is genuinely defective — the `/tmp` symlink and the unsigned-module issues are real — but they describe a platform this repo no longer targets. Recording them as open implied pending work that was never going to happen, and re-raising them each pass cost attention without producing improvement. The generalisable form: **verify the finding's premise still applies to the current platform before keeping it open**, which is the same check that killed REVIEW-029, REVIEW-032 and REVIEW-066 in earlier batches, applied here to two findings that are accurate but irrelevant. A third-party driver's install path, a deprecated desktop's config tree, and a personal shell profile are all cases where "it would be better this way" is not automatically "it should be changed" — the owner decides what their own backups are allowed to look like.
+
+---
+
+### [RESOLVED] Batch F — prompt username and the archived sway tree retired from scope (REVIEW-054, 065, 076, 077, 078, 079, 083, 088)
+
+Closed October 12, 2026. Eight findings, none of them worked. No file in the repository was modified in this batch.
+
+- **The archived `sway/` tree is out of scope permanently (REVIEW-065, 077, 078, 079, 083, 088).** Six findings sit in `sway/.config/waybar/config`, `sway/.config/sway/config` and `sway/README.md`. **This is the owner's own install record from a desktop environment they previously used and no longer run** — `sway` is not installed (`rpm -q sway` → not installed), and none of its toolchain (swaylock, swayidle, waybar, wofi, mako, grim, slurp, brightnessctl, playerctl) is present. The findings are accurate descriptions of that archived configuration: waybar exposing five workspaces against sway's ten bindings (065), an `include /etc/sway/config.d/*` glob matching nothing (077), a backlight module pinned to one machine's `amdgpu_bl1` device (078), Bluetooth format strings all reading `" OFF"` regardless of state (079), a README claiming a wallpaper was absent from the repo when it is not (083), and one launcher script bound to two key combinations at a hardcoded path (088). **They are closed as historical record, not fixed.** Do not edit, "repair", or re-raise anything under `sway/`. It is kept deliberately as a backup of a working configuration the owner may want again; the same decision already closed REVIEW-036 and REVIEW-037 in the first pass of this review. `sway/README.md` already carries an ARCHIVED banner naming every absent package, so nothing in the tree reads as live configuration.
+- **REVIEW-076 — superseded, not fixed.** This was logged against `gnome/.config/zed/keymap.json` at mode `0755`; it is not a sway finding and was swept into this batch by filename association. It was actually fixed in Batch B as REVIEW-109, which found twelve Markdown and JSON files carrying the executable bit in the git index and corrected all twelve to `0644`. `common/.config/zed/keymap.json` is now `644`, and a repo-wide sweep for non-script files at `0755` returns zero.
+- **REVIEW-054 — closed by owner decision, do not retry.** `common/.config/starship.toml` contains a literal `[ julry]` text segment rather than the `$username` variable, so the prompt would show the original owner's name if restored onto a different account. A fix was attempted during Batch D and **broke the prompt theme**: a text group cannot style a module variable, so the `username` module's own `style_user = 'bold yellow'` overrode the segment's `bg:#a3aed2 fg:#090c0c`, and adding a `[username]` block made starship substitute the module's default format — injecting a stray literal ` in ` and severing the background chain between the username and directory segments. The literal was reverted and both the repo and live copies were restored to the last known-good state, verified by diffing the rendered prompt byte-for-byte. Full root cause is in `error_memory.md` as ERR-005. **The owner has reviewed this and chosen to keep the literal.** If portability to another account is ever genuinely wanted, the only correct shape is `[username] style_user = "fg:#090c0c bg:#a3aed2"` with `$username` placed **outside** any text group, and it must be validated with `starship prompt | cat -v | grep -c '48;2;'` — checking that the string `julry` still appears proves nothing, since the broken version printed it too.
+
+**Prevention Strategy**: A finding is open only if someone intends to act on it. These eight were open because a review pass recorded observations without ever confirming that fixing them was wanted, and they survived four batches that way — long enough to be re-raised repeatedly and to accumulate entirely on the owner's attention. Two rules follow, both learned the hard way here. First, **scope is a property of a directory, not of individual findings**: if a tree is an archive, every finding pointing into it closes together, so a sweep that ends with any sway finding still open has not finished the job. Second, **a fix that regresses must not be re-opened as work** — the honest end state for REVIEW-054 is "attempted, reverted, documented, owner keeps the literal," not a live ticket inviting the next reviewer to try the same thing again. Re-opening it was my error; the finding had been closed by the owner and I undid that by carrying it forward.
+
+---
+
+### [RESOLVED] Batch E — personal workflow closed by owner decision; two findings resolved on evidence (REVIEW-062, 066, 067, 068, 069, 070, 080, 082, 089, 112)
+
+Closed October 12, 2026. **No code, config or workflow file was changed in this batch.** Ten findings, in two very different categories: eight describe the owner's deliberate shell workflow, and two are resolved by evidence rather than by preference.
+
+- **Closed by owner decision — the personal shell workflow (REVIEW-062, 067, 068, 069, 070, 080, 082).** These describe choices in `common/.bashrc`, `common/.config/fastfetch/config.jsonc`, `common/.config/kitty/kitty.conf` and `gnome/.config/autostart/lock-screen.desktop`: `fastfetch` on every terminal opened at `$HOME`, `zed` launched detached with output discarded, `zzed`/`repo` argument handling, `zoxide query -i` interactive selection, the `packages` key not padded to the 8-column width used by every sibling row, a comment crediting `picom` for an opacity setting kitty applies itself, and the `sleep 3; loginctl lock-session` autostart. The owner reviewed each and kept them. They are the workflow, not defects in it. **These files are not to be refactored, hardened or "corrected" for cosmetic reasons in any future pass** — a review that keeps re-raising them is producing noise, and `zzed` in particular is a personal tool with a personal shape.
+  Each was checked for correctness before closing rather than waved through. The three `.bashrc` findings are real edge cases that happen not to fire in the owner's environment: `$1` before `$#` is harmless because `.bashrc` never runs under `set -u`; `repo ref` returns 0 when `~/repo` is absent, which does not happen here; `zed` is a manual leftover on this machine and is present on the machine where `zzed` is used. They are documented here as known trade-offs, not as open work.
+- **REVIEW-066 — premise disproven.** The finding claimed `zoxide query -i "${@:2}"` and `zoxide query -i "$@"` "split on spaces". Both are correctly quoted and `"$@"` provably preserves an embedded space: `f() { printf '[%s]\n' "$@"; }; f "my project"` emits one argument, `[my project]`. The real, different observation is that `zoxide query -i` shells out to fzf and requires a TTY, so it fails with `inappropriate ioctl for device` in any non-interactive context. That does not affect the owner, who runs it from a terminal. Closed as a non-issue rather than "fixed", because changing the quoting would have changed nothing.
+- **REVIEW-089 — `/usr/sbin` binaries; already resolved by Batch A plus evidence.** Of the four binaries named, `zramctl` was fixed to `/usr/sbin/zramctl` at all six call sites in Batch A (REVIEW-105). The other two, `sysctl` and `update-alternatives`, were never broken: every call site is `sudo`-prefixed, and sudo resets `PATH` through `secure_path`, which includes `/usr/sbin` — so `sudo sysctl` resolves correctly even though the unprivileged shell cannot find `sysctl`. The documentation side was already correct too: `gnome/setup.md:511` states in bold that `efibootmgr` is at `/usr/sbin/` and is not on a user `PATH`. The finding's own recommendation had been satisfied before it was written. One residual observation is not a defect: `xrandr` appears bare inside the `toggle-screen-dim.sh` heredoc, but that script is written to `$HOME_DIR/.local/bin` and only runs in an XFCE session, and `xrandr` is a genuine X11 client that a user session can always execute.
+- **REVIEW-112 — no `.gitignore`.** Closed by owner decision on October 12, 2026: `.opencode/node_modules/` is to be excluded, and the owner handled the exclusion. This is the third and final time this finding has been raised (previously declined alongside REVIEW-039) and it is now closed rather than deferred, so it will not be re-raised.
+
+**Prevention Strategy**: A personal dotfiles repo is a working environment first and a codebase second. Findings that describe how the owner chose to work are not maintenance items, and re-raising them costs the owner attention while producing no improvement — the correct response to "this could break in an edge case" in a single-user shell profile is to write it down once and stop. The generalisable form: distinguish *defects* (the thing does not do what it claims) from *trade-offs* (the thing works, in the environment it is used in, and would need care elsewhere), and only keep the former open. Two of this batch's ten findings also failed verification outright — 066's stated cause was not real, and 089's was fixed before the finding existed — which is the second time in three batches that a finding's premise did not survive a check against the repo. The cheaper habit remains: re-derive the line number, run the command, and confirm the claim before recording it as open.
+
+---
+
+### [RESOLVED] Batch D — documentation and portability drift (REVIEW-043, 053, 054, 056, 059, 061, 063, 064, 084, 085, 086, 087)
+
+Twelve findings closed October 12, 2026. Ten were documentation that would send a reader to a path, a count, or a package that does not exist; two were config files that would not survive a move to another account. Verified against the repo after the edits — no assertion in this entry rests on the log.
+
+- **REVIEW-043 — dead `vscodefiles` paths.** `gnome/setup.md:238,332` and `xfce/setup.md:785` set `REPO=/home/julry/vscodefiles/linux-configs/...`. That entire tree is gone; the repo moved and was renamed. Every command in those blocks failed. The three sites now use `/path/to/linux-dotfiles/<de>`, and the GNOME one derives the path instead of hardcoding it. The same class of example was corrected in `cosmic/setup.md:206`.
+- **REVIEW-087 — copying from a tree that does not exist.** `xfce/setup.md` gave three `cp linux-configs/.config/…` blocks — wrong repo name *and* wrong level, since the dotfiles live under `xfce/`, not at the root. Correcting the name alone would still have left a broken path. All three now use `xfce/.config/…`, the surrounding "adjust the path" hedges are replaced with a concrete "run from the repo root, or just `bash xfce/setup.sh`", and the prose that claimed the GTK CSS lived at `.config/gtk-3.0/gtk.css` was corrected to `xfce/.config/gtk-3.0/gtk.css`.
+- **REVIEW-084 — docs appending to `.bashrc` that the scripts replace.** Three hand-run blocks told the reader to `echo … >> ~/.bashrc` (`gnome/setup.md`, `xfce/setup.md` ×2). Every `setup.sh` copies `common/.bashrc` wholesale, so following the docs by hand and then running the script produced duplicate `NODE_OPTIONS` and duplicate `eval "$(starship init bash)"` lines. All three blocks now copy `common/.bashrc` and say explicitly not to append.
+- **REVIEW-064 — stale kernels presented as live state.** `gnome/setup.md` pinned `7.2.5-1.1` and `7.2.6-1.1` as "verified live", and §13 told the reader to `sudo kernel-install remove 7.2.5-1-default` and to keep `7.2.5` as the fallback. The machine runs `7.2.9-1-default` with `7.2.8-1-default` installed — on a rolling-release distro those numbers were stale within days. The state line now records what is actually installed with a date and tells the reader to re-read `ls /lib/modules/`; the removal command is now `ls /lib/modules/` + `uname -r` + `remove <old-version>` with an explicit "NOT `$(uname -r)`" warning. Tumbleweed moves fast enough that a hardcoded version in a maintenance procedure is a defect, not a detail.
+- **REVIEW-054 — prompt hardcoded the username. ATTEMPTED, THEN REVERTED — still open.** `starship.toml` has a literal `[ julry]` text segment rather than the `$username` variable, so a restore onto a different account shows the original owner's name. The Batch D fix replaced it with `[ $username](bg:#a3aed2 fg:#090c0c)` plus a `[username]` block, and that **broke the theme**: a text group cannot style a module variable, so the module's own `style_user = 'bold yellow'` won and the segment lost its `#a3aed2` background; adding the `[username]` block also made starship substitute the module's default format, injecting a stray literal ` in ` and breaking adjacency with the next segment in the background chain. The literal was restored and `common/.config/starship.toml` plus the live `~/.config/starship.toml` are now byte-identical to the last known-good `HEAD` copy, verified by diffing the rendered prompt byte-for-byte. Recorded in `error_memory.md` as ERR-005. **Do not retry this without first proving the styling survives** — the correct shape, if it is ever wanted, is `[username] style_user = "fg:#090c0c bg:#a3aed2"` with `$username` placed outside any text group, checked with `starship prompt | cat -v | grep -c '48;2;'` rather than by confirming the string `julry` still appears.
+- **REVIEW-053 — hardcoded `/home/julry` paths.** Seventeen tracked files carried the original machine's path. Re-checked individually rather than by count: the four COSMIC config files are rebased by `cosmic/setup.sh` §6, `common/.bashrc` and `gnome/dconf/dash-to-panel.dconf` were already in their scripts' rebase lists — and `common/.config/fastfetch/config.jsonc` was **not**, in any of the three scripts, so a restore onto another account left the fastfetch logo pointing at a nonexistent `Documents/` file. The fastfetch config is now in all three rebase lists. The remaining occurrences are the literal search-and-replace strings inside the scripts themselves, the rebase verification `grep -l '/home/julry'`, and documentation that *describes* the rebase — all correct. The one un-rebased payload left is `xfce/.config/xfce4/…/xfce4-keyboard-shortcuts.xml`, which carries three live paths (the rofi launcher, the screen-dim script, and a `Pictures -c` argument); that file **is** already in `xfce/setup.sh`'s list.
+- **REVIEW-059 — invalid strict JSON.** `opencode.json` and `.opencode/workspace.json` each ended with a `// c: worrie` comment *after* the closing brace, which `json.load` rejects. Both now parse. `workspace_id` and `project_name` were deliberately left as `linux-configs` — that is REVIEW-060, which the owner is handling personally. The two Zed files also fail strict JSON, but they use `//` comments *inside* the object, which Zed's JSONC parser accepts by design; not a defect, and not changed.
+- **REVIEW-061 — `AGENTS.md` incomplete path table.** It listed `.opencode/rules/` and `.opencode/memory/` without naming their contents, and omitted `.opencode/archives/` entirely. All three are now enumerated file by file.
+- **REVIEW-086 — "Seven optimizations", five delivered.** `gnome/setup.md` §1 has five subsections (1A, 1D–1G; 1B GRUB and 1C ext4-reserve are absent because this is a btrfs/systemd-boot install, which the script states). Header now says Five. `xfce/setup.md` genuinely has seven (1A–1G) and is correct.
+- **REVIEW-085 — header contradicted its own list.** `gnome/setup.md` §3 was headed "GNOME Shell Extensions (dash-to-panel only)" and then listed three IDs. Now headed "(3 enabled)".
+- **REVIEW-063 — group-writable fastfetch config.** `common/.config/fastfetch/config.jsonc` was `0664` on disk. **This cannot be fixed in the repository:** git tracks only the executable bit, so a clone always checks out `0644` regardless of the working tree's mode. The local file was corrected to `0644` and the finding closed on that basis — the discrepancy was never representable in the index, which is why the original wording ("group-writable while git records 0644") described something no commit could ever fix.
+- **REVIEW-056 — `xfce/setup.md` reads as Mint-only.** The document is genuinely written in apt/dpkg throughout (36 `apt` references across nine sections), while `xfce/setup.sh` supports both Ubuntu-family and openSUSE-family. Rewriting 36 command blocks into a dual-dialect document risks getting package names wrong in both branches — the zypper equivalents differ (`zram-tools` vs `zram-generator`, `lightdm-slick-greeter` vs `cosmic-greeter`). The title no longer claims Mint-only, a banner now says the commands are the apt branch and points Tumbleweed users at `setup.sh`, and §0 states the substitution explicitly. This documents the asymmetry rather than hiding it.
+
+**Prevention Strategy**: Documentation defects cluster by type, and each type has one cheap check. A path is checkable with `[ -e "$path" ]`. A count is checkable by counting. A version string is checkable with `uname -r` — and on a rolling-release distro any version written into a doc decays on its own, so a maintenance procedure must show the reader how to re-derive it rather than hand them a number to trust. The one that bit hardest here was the prompt fix: substituting a config variable for a literal is not the same as making the variable render, and the only way to know was to run it. Every change in this batch that altered behaviour rather than prose was verified by executing it, not by re-reading the diff.
+
+---
+
+### [RESOLVED] Batch C — three security findings that did not survive verification against the live repo (REVIEW-029, 032, 081)
+
+Re-verified October 12, 2026. None of the three produced a code change, for three different reasons: one had already been empirically disproven by a successful push, one described code that does not exist in the repo, and one was never a secret. Closing them here rather than leaving them to be "fixed" against a premise that turned out to be wrong.
+
+- **REVIEW-029 — 24 `sk-`-shaped strings in committed transcripts.** The finding predicted these "will hard-fail secret scanning" and block pushes. **They have already been pushed.** `origin/main` is `github.com/worriee/linux-dotfiles.git` and `git grep -cE 'sk-[A-Za-z0-9]{20,}' origin/main -- sessions/` returns a hit in `session-oct-10.md`, `session-oct-8.md`, `session-oct_6.md` and `session-oct_6-1.md` — all four are in the public remote's history right now. GitHub push protection and secret scanning both ran over that push and passed it. The empirical test has already happened and the prediction was wrong. The matches were also confirmed false positives on inspection: every one is the tail of an SVG attribute dump, e.g. `...font-stretchmask-clipclipPathUnitsfont-variant...`, where `sk-clip` sits inside `mask-clip`. Six distinct strings, all `mask-<attribute>` concatenations, one line per file. The recommended `.gitattributes` with `sessions/* -diff` was **not** added: `-diff` only suppresses diff rendering and does nothing against push protection, so it would have been a change that looks like a mitigation and is not one. REVIEW-040 separately records the owner's decision to keep the transcripts, so the only real remedy — removing them — remains out of scope by that decision.
+- **REVIEW-032 — unpinned third-party kernel module built as root.** **This entry described code that does not exist in this repo.** It cited `xfce/setup.sh:381-392` and a `git clone --depth=1` of an unpinned branch. The MT7902 driver path vendors its sources in-repo at `xfce/drivers/mt7902/{mt7902-wifi,mt7902-bt}/`, each with a `dkms.conf` carrying `PACKAGE_VERSION="1.0"`, and the installer copies them with `sudo cp -r "$REPO/drivers/mt7902/..."` before `dkms install -m mt7902-wifi -v 1.0`. There is no clone and no floating ref in that block — the version is pinned by `dkms.conf` in the tree. The `git clone --depth=1 https://github.com/frederik-h/acer-wmi-battery.git /tmp/acer-wmi-battery` that REVIEW-032 describes is the **Acer battery** block, which is REVIEW-111 at its current lines 473-484; the line numbers in REVIEW-032 were captured before several earlier edits shifted them, and the finding was written against the wrong block. REVIEW-032 is therefore a stale duplicate of REVIEW-111 and is closed with it.
+- **REVIEW-081 — spotatui commits a playlist ID and a 161-track manifest.** One playlist, `2npedfnskpte`, 648 lines, already pushed to the public remote. A YouTube playlist ID is not a credential: it is the identifier in the URL of a playlist anyone can already view, and it grants no access beyond what the link itself gives. The track manifest is a cache of titles the tool re-fetches. This is a privacy preference about publishing listening history, not a vulnerability, and there is no secret to remove. Left in place; the remedy if the owner ever wants it is to drop `youtube_playlists.yml` from the repo and let spotatui rebuild it locally.
+
+**Prevention Strategy**: A security finding is a claim about what a system will do, so it has to be tested against that system before it is carried as open. REVIEW-029 asserted an outcome ("will hard-fail") that a completed push had already contradicted; REVIEW-032 asserted a defect in a code path that did not exist, because its line numbers were never re-validated after the file was edited around them. Both survived two review passes because the log records the reasoning rather than the evidence. The habit that catches this is cheap: for any claim of the form "X will fail" or "X is unpinned", run the one command that settles it — `git grep` against the remote, or re-derive the line number and read the block — and paste the result into the finding. A finding whose file:line no longer resolves is not a finding, it is a stale pointer.
+
+---
+
+### [RESOLVED] Batch B — a fresh machine now gets every asset the configs reference (REVIEW-028, 107, 108, 109, 110)
+
+Five findings, all the same root cause: assets that the shared config references lived in a DE-specific tree, so the installers that copy `common/.config` were restoring configs whose assets no one had installed. Fixed October 12, 2026. The three setup scripts were already structurally correct — each had a guarded `cp -rb "$COMMON_DIR/…"` block for `.config`. Batch B extended that same pattern to `.local`, `assets` and `wallpapers` rather than adding anything new.
+
+- **REVIEW-107 — Nerd Fonts reachable only to XFCE.** The four JetBrains Mono Nerd Font TTFs sat at `xfce/.local/share/fonts/` and `xfce/setup.sh` was the only script that copied them, while `gnome/setup.sh:191` and `cosmic/setup.sh:400` both claimed in prose that fonts came from the XFCE tree. Neither ever read it. A fresh COSMIC or GNOME box therefore restored kitty, fastfetch and starship configs that all reference Nerd Font glyphs with no Nerd Font installed. The tree moved to `common/.local/share/fonts/` and all three scripts now copy it before restoring any config.
+- **REVIEW-108 — wallpaper move was half-applied.** The owner had moved `wallpapers/bg1.jpg` to `common/wallpapers/` because it is used across all three DEs, but no script copied it and six documentation lines still claimed the image was absent from the repo. Every installer now copies `common/wallpapers/` to `~/wallpapers/`, which is where the restored COSMIC config and the slick-greeter both point. The `README.md` rows and all four `cosmic/setup.md` claims were corrected. The file also remains untracked and needs `git add` by the owner.
+- **REVIEW-110 — fastfetch logo unreachable outside GNOME.** `common/.config/fastfetch/config.jsonc:5` points at `/home/julry/Documents/jm-icon.png`; the image was vendored at `gnome/assets/jm-icon.png` and only `gnome/setup.sh` copied it there. COSMIC and XFCE installed the shared fastfetch config without the asset, so the logo silently fell back to the default. The image moved to `common/assets/jm-icon.png` and all three installers now place it in `Documents/`, where the dash-to-panel dconf dump also expects it.
+- **REVIEW-109 — twelve non-script files at mode 0755.** `git ls-files -s | grep '^100755'` returned 26 entries, of which twelve were Markdown and JSON data files that are never executed: `AGENTS.md`, `opencode.json`, `common/.config/zed/keymap.json`, five `.opencode/archives/*.md` and four `.opencode/memory/*.md`. All twelve are now `644` in the working tree; the mode change lands in the index on the owner's next `git add`. This extends REVIEW-076, which was logged against two files and captured four of the twelve.
+- **REVIEW-028 — slick-greeter wrote an unconditional config for a deleted wallpaper.** `xfce/setup.sh` tested for `xfce/background.jpg`, which was deleted in commit `0b970457`, warned, and then wrote `/etc/lightdm/slick-greeter.conf` anyway with an unconditional `OK` — so a fresh XFCE install got a greeter pointing at a file that was never installed. The greeter step now takes its wallpaper from the freshly copied `~/wallpapers/` tree, and when none is found it says so plainly instead of claiming success.
+
+**Prevention Strategy**: A config file and the assets it references are one unit, and the copy step that installs one without the other is worse than installing neither — it produces a config that looks applied and silently falls back at runtime. The rule that generalises: when a file is shared across desktops, everything it points at by path is shared too, and it ships in the same directory. REVIEW-053 flagged 20+ hardcoded `/home/julry` paths as a MEDIUM cosmetic issue in the same repo where three assets sat in the wrong tree and no installer could reach them; a path count is not a measure of impact. Severity should follow what breaks on a fresh machine, not how many lines mention it.
+
+---
+
+### [RESOLVED] Batch A — setup scripts stopped reporting failures that were not happening (REVIEW-071, 072, 073, 074, 075, 105)
+
+Six findings in the installer scripts, fixed October 12, 2026. Five were the "the script lies about system state" class; one was a portability crash. The sharpest was 105: all three installers verified zram on every run using a binary that is not on the user PATH, so the check could never succeed and every run appended a false `zram verify` failure.
+
+- **REVIEW-105 — `zramctl` called unprivileged.** The binary is `/usr/sbin/zramctl`; this machine's user PATH has no `/usr/sbin` (`command -v zramctl` returns nothing). `2>/dev/null` swallowed the "command not found" text, so `zramctl --noheadings --output ALGORITHM | grep -qi zstd` always evaluated false. All three scripts therefore printed `zram config written but zstd not active — reboot` and appended `zram verify` to `FAILED_STEPS` on **every run**, against a zram that was working correctly (verified live: `/sys/block/zram0/disksize` = 7511998464). Six call sites at `gnome/setup.sh:273,282`, `xfce/setup.sh:286,295`, `cosmic/setup.sh:159,168` now use `/usr/sbin/zramctl`, matching the pattern already used correctly for `sysctl` in `common/.bashrc:135`.
+- **REVIEW-071 — `pkg_in()` defined and never called.** `gnome/setup.sh` defined the helper at line 46 while installing packages through an inline `bash -c 'sudo zypper -n ref && sudo zypper -n in ...'` string, leaving dead code and a second divergent install path. The install now routes through `pkg_in`, which absorbed the metadata refresh; the inline string is gone.
+- **REVIEW-072 — `sudo zypper se` inside a per-package loop.** Nine (GNOME) and twelve (XFCE) iterations each ran a full privileged repo query — repeated metadata work and repeated credential prompts for a purely informational dry-check. Both scripts now do one `sudo zypper -n ref` up front and then probe unprivileged, since `/var/cache/zypp/raw` is world-readable (`755`, verified). Measured on this machine: a single unprivileged `zypper se` resolves in ~4.8s against the existing cache, with no refresh and no prompt.
+- **REVIEW-073 — multi-unit `systemctl disable --now`.** `systemctl disable --now cups.service cups.socket avahi-daemon.service avahi-daemon.socket` returns non-zero if **any** named unit is absent, so on a machine without Avahi three units disabled correctly and the script still emitted a `WARN` plus a `FAILED_STEPS` entry. `gnome/setup.sh` now checks each unit with `systemctl list-unit-files` and disables it individually, reporting disabled and not-present sets separately. Genuine per-unit failures still record a `FAILED_STEPS` entry, now naming the unit that actually failed.
+- **REVIEW-074 — `REPO` resolution under `set -u`.** `dirname "${BASH_SOURCE[0]}"` aborts with an unbound-variable error when the script is piped (`curl … | bash`) or fed via stdin, because `BASH_SOURCE[0]` is unset in those cases. All three scripts now use `${BASH_SOURCE[0]:-$0}`, which is the same fallback `COMMON_DIR` already used.
+- **REVIEW-075 — `systemctl restart dev-zram0.swap`.** Restarting the swap unit does not recreate `/dev/zram0` with the new compression settings, so the line could never make the following `zramctl` verification succeed — it only added a failure path. The restart was removed from the install path in all three scripts and replaced with a plain statement that a reboot is required, plus the manual `zramctl` command to check afterwards. The `rest` alias in `common/.bashrc:134` is unchanged: restarting swap plus the display manager is a legitimate user-initiated reboot substitute.
+
+**Prevention Strategy**: A verification step that cannot succeed is worse than no verification step — it manufactures false failures that train the reader to ignore the summary. Two rules follow. First, a privileged binary is called by absolute path in an installer that runs unprivileged; `command -v` succeeding on the author's shell is not evidence that the binary is reachable from the script. Second, any tool whose contract is "all of these or nothing" (`systemctl disable` across a unit list) must be decomposed per item when the units are independently optional. REVIEW-089 predicted both the 105 and 073 classes from a three-line symptom and sat at LOW severity for too long — a log entry's severity reflects when it was written, not what it eventually costs.
+
+---
+
+### [RESOLVED] Verified fixed on re-audit — Batch 3 and the `common/` consolidation (REVIEW-030, 031, 033, 035, 046, 047, 048, 049, 050, 051, 052, 055, 094, 095)
+
+These fourteen were repaired during the October 11, 2026 batches but were retained in Section 1 as status stubs, which made the log report them as open. Re-verified against the repo on October 12, 2026, 10:12 AM PST before migrating; all fourteen confirmed fixed.
+
+- **REVIEW-030 / 095 — `.bashrc` guard and alias naming.** The install guard compared a marker string instead of content, so after the first run no later `.bashrc` edit could ever land; a companion `sed` deleted the user's own alias and re-appended it renamed, and the README documented a `fresh` alias plus three `batt*` aliases that exist nowhere (`grep -c batt` → 0). The guard now compares content (`cmp -s "$COMMON_DIR/.bashrc" "$HOME_DIR/.bashrc"`), the installers write `alias rest=` matching the shipped file, the `sed` removes only the `# distro-fresh-alias` marker, and the README's false claims are gone. `grep -c 'alias fresh='` → 0 across all three files.
+- **REVIEW-031 — unpinned `curl | sh`.** `curl -sS https://starship.rs/install.sh | sh` had no `-f`, so an HTTP error body was piped into a shell and the step still printed `OK`. Both installers now use `curl -fsSL -o "$_SH_TMP"`, verify the download is non-empty, and `rm -f` the temp file on both paths. `grep -c 'curl -sS'` → 0.
+- **REVIEW-033 — dead directory at the front of `PATH`.** `common/.bashrc:123` prepended `/home/julry/.opencode/bin`, which does not exist — a binary-hijack vector on any shared account. Line deleted; `grep -c 'opencode/bin'` → 0.
+- **REVIEW-035 — `A && B || C` misreported copy failure.** `[ -d src ] && cp … || WARN "missing"` printed "missing" when the *copy* failed, sending the user to the wrong cause. Both XFCE copies converted to `if/else` with distinct "copy failed" and "missing" messages. The 187MB icon-recopy half became moot when `xfce/.icons/` was deleted.
+- **REVIEW-046 — predictable `/tmp` state file.** `/tmp/.screen_dim_toggle_state` is a name any local user can pre-create to break the brightness toggle. Now `${XDG_RUNTIME_DIR:-/tmp}/…` (per-user, mode 0700), plus an explicit exit when the `xrandr` display lookup finds nothing. `grep -c` → 0.
+- **REVIEW-047 — DKMS copy nested on re-run.** `cp -r src /usr/src/mt7902-wifi-1.0` copies *into* an existing destination, producing `…/mt7902-wifi-1.0/mt7902-wifi/…` and breaking `dkms install`. Destinations are now cleared first.
+- **REVIEW-048 — always exit 0.** Both scripts reported success even when every step failed, so any wrapper or CI job saw green on a total failure. Both now test `${#FAILED_STEPS[@]}` before the final `exit 0`.
+- **REVIEW-049 — path rewrite hid its errors.** `sed -i … 2>/dev/null || true` followed by an unconditional `OK` printed success even when no target existed. Rewritten to model the working version in `cosmic/setup.sh`: short-circuit when `HOME_DIR` is already `/home/julry`, verify the rewrite landed, and record `FAILED_STEPS` on failure.
+- **REVIEW-050 / 051 / 052 — duplicated files.** Three byte-identical `.bashrc` (git blob `6e6f15cc`), three identical `fastfetch/config.jsonc` (blob `2bd2cf39`), and two identical 21KB spotatui manifests. The duplication had already produced four separate drift bugs. All consolidated into `common/`; `find` now returns exactly one `.bashrc`, one fastfetch config, and one playlist manifest in the repo. `gnome/setup.sh` and `xfce/setup.sh` copy from `COMMON_DIR` before their DE-specific pass.
+- **REVIEW-055 — repo drifted from live.** `common/.config/zed/settings.json` carried `"dark": "Transparent Prism - Sunset"` while live had `"dark": "Ayu Glass Dark"`; a September 2026 review had fixed this once and it drifted back. Now byte-identical to live, and the other shared files (kitty, starship, fastfetch, `.bashrc`) were verified already converged.
+- **REVIEW-094 — plugins unbacked.** The OpenCode tree was untracked, so the documented backup did not exist in the repo. Now consolidated at `common/.config/opencode/` with `opencode.jsonc`, `plugins/{rtk,caveman}.ts` and the caveman skill.
+
+**Prevention Strategy**: A marker string cannot distinguish "already up to date" from "written once and never updated again" — an idempotency guard must compare the thing it guards. A file vendored in N places is N bugs waiting to happen; this repo produced four before the consolidation. And a fix that is never migrated out of Section 1 is indistinguishable from an unfixed one, which is why a periodic re-verification against the repo — not against the log — is the only reliable way to know what is actually still broken.
+
+---
+
+### [RESOLVED] Autostart grants root permanent X11 access — kept by owner decision (REVIEW-027)
+
+- **The Issue**: `cosmic/.config/autostart/xhost-root.desktop` runs `Exec=xhost +si:localuser:root` at every login and nothing ever revokes it with `xhost -SI:localuser:root`. Any local X client bug — image decoding, clipboard, fontconfig, browser rendering — would execute as root for the life of the session. A second copy of the same grant sits in the archived `sway/.config/sway/config:276`.
+- **The Resolution**: Kept deliberately by the repository owner on October 11, 2026. No code change. Required for the YaST GUI, which needs root X access to draw, and COSMIC is the daily driver where that workflow is actually used.
+- **Compensating Control**: Documented in `cosmic/setup.md` §9 alongside the on-demand alternative (`xhost +SI:localuser:root` immediately before the privileged launch, `-SI` in a trap after), so the exposure is recorded rather than accidental.
+- **Prevention Strategy**: A permanent privilege grant should be a decision with a written rationale, not a config that exists because it was added once. If the YaST workflow ever changes, this is the line to revisit first.
+
+---
+
+### [RESOLVED] Sway idle lock commented out while docs promise a 900s lock — archived DE (REVIEW-036)
+
+- **The Issue**: `sway/.config/sway/config:46-48` is entirely commented out — no `swayidle` process ever starts. The prose directly below it at lines 50-51 states "Locks after 900s (15min) idle", and `sway/README.md:13-14` lists "idle lock 900s" as a feature. An unattended sway session would stay unlocked indefinitely while two documents claim otherwise.
+- **The Resolution**: Kept by the repository owner on October 11, 2026. No code change. Sway was removed from the live system; `rpm -q sway` returns not installed and the entire toolchain (swaylock, swayidle, waybar, wofi, mako, grim, slurp, brightnessctl, playerctl) is absent. The config is retained as a historical record only and cannot be started on this machine.
+- **Compensating Control**: `sway/README.md` carries an ARCHIVED banner naming every absent package, so the false claim is marked as historical rather than offered as current behaviour.
+- **Prevention Strategy**: When a config is archived, comments describing disabled behaviour must be marked as disabled at the point of the comment, not only in a README far away — a reader who opens `config` alone should not believe a lock exists.
+
+---
+
+### [RESOLVED] WiFi passphrase visible in `nmcli` argv — archived DE (REVIEW-037)
+
+- **The Issue**: `sway/.local/bin/wifi-menu.sh:24-25` captures the passphrase with `wofi --password` and passes it as `nmcli device wifi connect "$SSID" password "$PASS"`, putting the PSK in `/proc/<pid>/cmdline` and in `ps` output for the lifetime of the call, readable by any local user.
+- **The Resolution**: Kept by the repository owner on October 11, 2026. No code change. Sway is archived and uninstalled, so the script is never executed. The safe alternative (`nmcli --ask device wifi connect "$SSID"`, letting nmcli prompt itself and keeping the secret out of argv) is recorded here should the config ever be revived.
+- **Compensating Control**: None needed while the package is absent; the fix is documented for the case where sway is restored.
+- **Prevention Strategy**: Never pass a secret as a command-line argument — argv is world-readable through `/proc` for the life of the process. Use a prompt, a file with restrictive permissions, or stdin.
+
+---
+
+### [RESOLVED] 13 AI transcripts, 3.6MB, committed to a public repo — kept by owner decision (REVIEW-040)
+
+- **The Issue**: All 13 `sessions/*.md` files are tracked. `session-oct-10.md` alone is 8,092 lines / 451KB. They are conversation transcripts, not configuration — 827 hardcoded `/home/julry` path references and every debugging dead-end. A `git add -A` from a fresh clone would pull 3.6MB of non-config, and they permanently widen the blast radius of any future `grep`.
+- **The Resolution**: Kept deliberately by the repository owner on October 11, 2026, as the personal record of how this dotfiles repo was built. No code change. They are the primary source for much of the drift analysis in this log.
+- **Compensating Control**: The 24 `sk-`-shaped strings these files contain (REVIEW-029) are confirmed false positives — concatenated SVG `mask-*` attributes from a resvg glyph dump — but they remain a secret-scanner trip risk on a public remote.
+- **Prevention Strategy**: Non-configuration content in a config repo needs a deliberate decision and a stated rationale. Keeping it is fine; keeping it accidentally is not.
+
+---
+
+### [RESOLVED] `xfce/setup.md` claims the Acer battery driver is loaded — Mint-era doc (REVIEW-057)
+
+- **The Issue**: `xfce/setup.md` states "**Current state (this machine):** driver is installed and loading at boot" and documents `batt80` / `batt100` / `battstat` aliases reading `/sys/bus/wmi/drivers/acer-wmi-battery/health_mode`. On the live system `lsmod | grep -i acer` shows only `acer_wmi`, `acer_wireless` and `wmi-bmof` — there is no `acer-wmi-battery` module, and `/sys/bus/wmi/drivers/` contains only `wmi-bmof`. Every documented alias would fail.
+- **The Resolution**: Kept by the repository owner on October 11, 2026. No code change. The document is a Linux Mint / Ubuntu-era guide; the machine runs openSUSE Tumbleweed, where GNOME's equivalent doc correctly records the driver as skipped. The claim is wrong for Mint too, but it describes a machine that does not exist here.
+- **Compensating Control**: None. `gnome/setup.md:164` states the accurate position for the platform actually in use.
+- **Prevention Strategy**: A "current state (this machine)" claim is an assertion about live hardware and must be re-verified whenever the platform changes — or removed, because it decays silently.
+
+---
+
+### [RESOLVED] MT7902 DKMS shown as live procedure while the doc calls it deprecated — Mint-era doc (REVIEW-058)
+
+- **The Issue**: `xfce/setup.md` §2A is written as an active 6-step DKMS install, while a deprecation note 60 lines later says the opposite, and the summary table claims "Wi-Fi + BT work on MediaTek 7902 cards". On the live system the in-kernel `mt7921e` driver is loaded and `dkms` is not installed at all.
+- **The Resolution**: Kept by the repository owner on October 11, 2026. No code change. MT7902 works out of the box on Tumbleweed via the in-kernel driver, so the procedure is irrelevant to the platform in use; `gnome/setup.md` handles the same section correctly as fully deprecated.
+- **Compensating Control**: The inaccuracy is confined to the Mint-oriented guide. The internal contradiction between §2A and its own summary table remains documented rather than silently edited.
+- **Prevention Strategy**: A procedure and its own deprecation note in the same file is a contradiction a reader will resolve wrongly. When a path is deprecated, the procedure moves to an appendix — it does not stay in the main flow with a caveat below it.
+
+---
+
+### [RESOLVED] `workspace.json` identity names a project that no longer exists — owner to change (REVIEW-060)
+
+- **The Issue**: `.opencode/workspace.json:3-4` sets both `workspace_id` and `project_name` to `linux-configs`, while the repo directory, the git remote and the README all say `linux-dotfiles`. `.clinerules` §OBSIDIAN SYNC mandates using the exact `project_name` to build the vault mirror path, so `-obsidian` would mirror into a directory corresponding to nothing in this repo.
+- **The Resolution**: Deferred to the repository owner, who will make the change personally. No automated fix was attempted. `.clinerules:118` forbids the AI from editing workspace identity fields after init — `template_version` during `-update` is the sole exception.
+- **Compensating Control**: The mismatch is recorded here so a later `-obsidian` run is known to produce a `linux-configs/` path until the owner corrects it.
+- **Prevention Strategy**: Identity fields in a config file are load-bearing for every path-building consumer. They must be renamed together with the thing they name, in the same change that renames the thing.
+
+---
+
+### [RESOLVED] 187MB icon theme removed; repo cut from 43,797 files to 884 (REVIEW-039)
+
+- **The Issue**: `xfce/.icons/` was a vendored WhiteSur icon theme totalling 187MB across 43,099 files — 98.5% of every tracked file in a repo whose real configuration is roughly 60 files. The working tree was 205MB and `.git` carried 44MB including 5.38 MiB of orphaned garbage from an aborted gc. With no root `.gitignore`, the `git add -A` that `xfce/fresh-install.md:130` instructs would also have swept in the `*.log`, `*.bak` and `*~` files both installers generate via `cp -b`.
+- **The Resolution**: All three WhiteSur themes were removed from the repo and committed in `936ea2e1`, which deleted 234,158 lines. `xfce/setup.sh` lost its unconditional 187MB copy step and now carries a comment pointing at `setup.md` §0 instead; `setup.md` §0 documents the theme as not vendored, with an install step and an explicit note that the upstream URL is unpinned on purpose. October 11, 2026. Verified after the restructure: `git ls-files | wc -l` returns 884 (was 43,797), `.git` is 40MB (was 187MB), and the working tree excluding `.git` is 81MB (was 205MB).
+- **Residual**: A root `.gitignore` is still absent — only `.opencode/.gitignore` and two inside `xfce/drivers/` exist. Without one, a fresh `git add -A` can still sweep in `*.log`, `*.bak`, `*~` and `.cache/` produced by the installers' `cp -b` backups. Tracked as a separate follow-up rather than folded in here, because writing `.gitignore` was explicitly deferred by the owner.
+- **Prevention Strategy**: Vendoring a large upstream asset into a config repo inverts the cost ratio — 43,000 files to maintain a theme that has a download URL. Vendor text; fetch binaries at install time. And a repo with no `.gitignore` has no guard against generated files at all, regardless of how disciplined the current workflow happens to be.
+
+---
 
 ### [RESOLVED] README path drift and stale claims fixed; compaction block made schema-valid (REVIEW-038, 041, 042, 044, 045)
 
@@ -835,7 +517,10 @@ _Move reviews to this section once they are completely verified as resolved. Thi
 - **High Findings**: 21
 - **Medium Findings**: 26
 - **Low Findings**: 28
-- **Last Review Date**: `October 11, 2026, 08:35 AM PST`
+- **Last Review Date**: `October 11, 2026, 08:35 PM PST`
+- **Current Split (October 12, 2026, after Batch G)**: **0 open · 53 resolved. The review log is closed.** Every finding from the original 63-finding October 11 audit plus the 8 added by the second `-r` pass has been either fixed, closed by owner decision, or closed after its premise failed verification. Nothing is pending.
+- **Permanently out of scope — do not re-raise**: `sway/` (archived install record — 065, 077, 078, 079, 083, 088), the out-of-tree kernel-driver path in `xfce/setup.sh` (Mint-only — 106, 111), the personal shell workflow in `.bashrc`/fastfetch/kitty/lock-screen (062, 067, 068, 069, 070, 080, 082), and REVIEW-054 (prompt username — fix attempted, reverted, owner keeps the literal).
+- **Batch history**: A migrated 6 (071, 072, 073, 074, 075, 105) · B migrated 5 (028, 107, 108, 109, 110) · C closed 3 with no code change (029, 032, 081 — every premise failed verification) · D migrated 11 (043, 053, 056, 059, 061, 063, 064, 084, 085, 086, 087) · E closed 10 with no code change (062, 066, 067, 068, 069, 070, 080, 082, 089, 112) · F closed 8 with no code change (054, 065, 076, 077, 078, 079, 083, 088) · G closed 2 with no code change (106, 111). Net code changes across all batches: 22 findings fixed, 31 closed without a code change.
 
 ---
 

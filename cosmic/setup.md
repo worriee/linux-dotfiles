@@ -49,7 +49,7 @@ Read this file first if you are doing the steps by hand, or if `setup.sh` report
   | Archived `sway/` | Archived, no setup script. |
   | Display manager (GDM/greetd) | Deliberately left exactly as found — see above. |
   | Bootloader / Secure Boot chain | `untouched (by design)`; see `gnome/setup.md` Sections 12–13 if you need it. |
-  | Fonts | Not vendored under `cosmic/`. See Section 6. |
+  | Fonts | Vendored in `common/`, copied by the shared-assets step. See Section 4. |
 
 - **`.bashrc` moved to `common/`.** It is no longer under `cosmic/`. `cosmic/setup.sh` copies it from `common/.bashrc` with the same `grep`-guarded, backup-preserving block the GNOME script uses.
 
@@ -203,7 +203,7 @@ Each subdirectory is one COSMIC component's settings, stored as flat key files u
 ### How restore works
 
 ```bash
-REPO=/home/julry/repo/linux-dotfiles
+REPO=/path/to/linux-dotfiles/cosmic
 cp -a "$REPO/cosmic/.config/cosmic/." "$HOME/.config/cosmic/"
 ```
 
@@ -319,11 +319,10 @@ All in `com.system76.CosmicTk/v1/` (or the `CosmicTheme.*` dirs for colours).
 
 ### Font dependency
 
-**`JetBrainsMonoNL Nerd Font` and `JetBrains Mono` are not vendored in `cosmic/`.** They come from the font tree under the other DE directories. On a genuinely fresh machine, install them before running the restore, or COSMIC will silently fall back to a default font:
+**`JetBrainsMonoNL Nerd Font` and `JetBrains Mono` ship in the repo** at `common/.local/share/fonts/`, and `setup.sh` copies them to `~/.local/share/fonts/` during the shared-assets step before any config is restored. Nothing needs to be installed by hand — this was previously a manual prerequisite and a silent fallback on a fresh machine.
 
 ```bash
-fc-cache -f
-fc-list | grep -i 'jetbrains'
+fc-list | grep -i 'jetbrains'   # populated by setup.sh
 ```
 
 `setup.sh` runs `fc-cache -f` and then refreshes the GTK4 (or GTK3) icon cache, since GTK-based apps — including some COSMIC components — cache icon theme and font choices at startup.
@@ -504,11 +503,11 @@ com.system76.CosmicBackground/v1/all
 - `scaling_mode: Zoom` — crops to fill, no letterboxing. Right choice for a laptop panel.
 - `same-on-all: true` — one wallpaper across every output.
 
-**The wallpaper image itself is not in the repo.** `~/wallpapers/bg1.jpg` lives only on this machine. On a fresh install, copy your images there first, or `setup.sh`'s path rebase will point at a file that does not exist and COSMIC falls back to a solid colour.
+**The wallpaper ships in the repo** at `common/wallpapers/bg1.jpg`, and `setup.sh` copies it to `~/wallpapers/` during the shared-assets step. You do not need to place any images by hand — if you add more, drop them in `common/wallpapers/` and they will be copied on the next run.
 
 ```bash
-ls ~/wallpapers/                       # images must exist here
-mkdir -p ~/wallpapers                  # if not
+ls ~/wallpapers/                       # populated by setup.sh
+ls common/wallpapers/                  # the tracked source
 ```
 
 ---
@@ -690,7 +689,7 @@ Things that are true right now and will bite later.
 | - | ----- | ------ | --- |
 | 1 | **`~/.opencode/bin` in `common/.bashrc` does not exist** | Dead `PATH` entry. `opencode` actually resolves via nvm (`~/.config/nvm/versions/node/v24.21.0/bin`). | Drop the line, or point it at the nvm bin dir. |
 | 2 | **Four cosmic files hardcode `/home/julry`** | Restoring onto another account gives broken wallpaper and bookmarks. | `setup.sh` rebases them on the installed copy. Do **not** commit a rebased copy back to the repo. |
-| 3 | **`~/wallpapers/bg1.jpg` is not in the repo** | Fresh install gets a flat background. | Copy the images to `~/wallpapers/` before restoring. |
+| 3 | ~~**`~/wallpapers/bg1.jpg` is not in the repo**~~ | **Resolved** — the image ships at `common/wallpapers/bg1.jpg` and `setup.sh` copies it. Was previously a manual step. | Nothing; the shared-assets step handles it. |
 | 4 | **`zed` is not in the Tumbleweed repos** | `zypper se -x --match-exact zed` returns nothing. Installed manually at `~/.local/zed.app` with a symlink in `~/.local/bin`. | Install manually; `setup.sh` reports it as a leftover, not a failure. |
 | 5 | **The `rest` alias name** | Older docs say `fresh`. | Use `rest`. |
 | 6 | **`setup.sh` mutates two tracked repo files** | `common/.bashrc` and `common/.config/opencode/opencode.jsonc` are `sed`-ed in place on every run. A pull can conflict. | Resolve conflicts by hand; consider moving the rewrite to a non-tracked copy. |
@@ -735,7 +734,7 @@ Things that are true right now and will bite later.
 | ----------------- | ------ | ----- | ----- |
 | COSMIC config restore | stock / empty | **189 files, 33 setting dirs** | The primary payload. `cp -a`, tar-backed. |
 | Icon theme | distro default | **`Reversal-grey`** | Not vendored — must be installed separately. |
-| Interface font | default | **`JetBrainsMonoNL Nerd Font`** | From the font tree in the other DE dirs. |
+| Interface font | default | **`JetBrainsMonoNL Nerd Font`** | Installed by `setup.sh` from `common/.local/share/fonts/`. |
 | Monospace font | default | **`JetBrains Mono`** | |
 | Header size / density | default | **`Compact` / `Compact`** | Tightest layout. |
 | Panel | default | **Left-anchored, XS, never autohide, exclusive zone** | Clock centre; workspaces + applets in the wings. |
@@ -746,7 +745,7 @@ Things that are true right now and will bite later.
 | Workspaces | default | **OutputBound, Horizontal**, wraparound on | Typing opens the launcher instead of switching. |
 | Pointer accel | default | **Enabled, Flat profile** | `left_handed: false`. |
 | Window clipping/shadows | on | **all off** | Flat tiled windows. |
-| Wallpaper | stock | `bg1.jpg`, Zoom, 5-min rotation, theme-filtered | Image itself is **not** in the repo. |
+| Wallpaper | stock | `bg1.jpg`, Zoom, 5-min rotation, theme-filtered | Image ships in the repo at `common/wallpapers/`; `setup.sh` copies it to `~/wallpapers/`. |
 | Keyboard shortcuts | defaults | **COSMIC binding set** | No hot-reload — re-login required. |
 
 ### Workspace

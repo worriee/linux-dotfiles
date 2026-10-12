@@ -24,7 +24,8 @@ The specialized operational personas are modularly isolated as native Agent Skil
 
 All persistent state tracking is centralized in two locations:
 
-- **Configuration Rules**: `.opencode/rules/` — Core behavioral constraints and task tracker
-- **Specialized Memory Logs**: `.opencode/memory/` — Error logs, codebase maps, implementation plans, security analysis, code reviews, and test strategies
+- **Configuration Rules**: `.opencode/rules/` — Core behavioral constraints (`.clinerules`) and context/boundary rules (`system_instructions.md`), plus `project_memory.md`
+- **Specialized Memory Logs**: `.opencode/memory/` — Error logs (`error_memory.md`), codebase maps (`codebase_map.md`), implementation plans, security analysis, code reviews, and test strategies
+- **Closed / Archived Logs**: `.opencode/archives/` — prior-run logs (`error_archive.md`, `implementation_archive.md`, `review_archive.md`, `security_archive.md`, `test_archive.md`), superseded but retained as history
 
 <!-- c: worrie -->

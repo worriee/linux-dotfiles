@@ -1,6 +1,8 @@
-# Linux Mint XFCE Post-Install System Optimizations (XFCE-only)
+# XFCE Post-Install System Optimizations (XFCE-only)
 
-Seven performance, storage and service optimizations for Linux Mint XFCE on laptops with SSDs and 8GB–16GB RAM, tuned for a coding-heavy workflow (Zed, opencode, Node, Kitty). XFCE-only — does not apply to other desktops.
+Seven performance, storage and service optimizations for XFCE on laptops with SSDs and 8GB–16GB RAM, tuned for a coding-heavy workflow (Zed, opencode, Node, Kitty). XFCE-only — does not apply to other desktops.
+
+**Commands below are written for Linux Mint / Ubuntu (apt).** For openSUSE Tumbleweed, run `bash xfce/setup.sh` rather than following this by hand — the script already branches per distro and does the right thing on both. Section 0 lists what differs.
 
 Run in this order after a fresh install.
 
@@ -12,6 +14,7 @@ Run in this order after a fresh install.
 - Mint / Ubuntu (apt): full flow, including the GRUB-timeout step and `zram-tools` (`/etc/default/zramswap`).
 - openSUSE Tumbleweed XFCE (zypper): same script, branched — `zram-generator` instead of `zram-tools`, `/etc/sysconfig/earlyoom`, slick-greeter via `lightdm-slick-greeter` + `update-alternatives`, GRUB step skipped (bootloader untouched), btrfs root auto-skips the ext4 reserve step, snapper `pre-dotfiles` snapshot.
 - Older prose below may predate the XFCE-only scope; this section is authoritative.
+- **Command dialect.** Every `apt` / `dpkg` / `flatpak uninstall` block below is the **Mint / Ubuntu branch**. On openSUSE Tumbleweed the equivalents are `zypper -n in`, `rpm -Va`, and `flatpak uninstall --unused` — but the package *names* differ too (`zram-tools` vs `zram-generator`, `lightdm-slick-greeter` vs `cosmic-greeter`), which is why this document is not dual-written. **On Tumbleweed, run `bash xfce/setup.sh`.** It carries both branches explicitly and was tested on both.
 - **Icon theme is not vendored.** `xfce/.icons/` (WhiteSur-grey) was 187MB across 43,099 files — 98% of everything in this repo — and was removed so clones stay small. `setup.sh` therefore does **not** install icons. Install the theme yourself before relying on the `WhiteSur-grey-dark` references in §5 (rofi Type-3 launcher):
 
   ```bash
@@ -231,11 +234,12 @@ Caps the V8 JavaScript heap at **1536MB** so opencode sessions and npm builds de
 #### Step-by-Step
 
 ```bash
-# Append the Node.js memory ceiling parameter to your user shell configuration
-echo 'export NODE_OPTIONS="--max-old-space-size=1536"' >> ~/.bashrc
+# Do NOT append to ~/.bashrc here. `setup.sh` copies common/.bashrc wholesale and it
+# already carries the Node ceiling — appending by hand duplicates the line on every run.
+cp "$REPO/../common/.bashrc" ~/.bashrc
 ```
 
-Verify: `source ~/.bashrc && echo $NODE_OPTIONS` → `--max-old-space-size=1536`.
+Verify: `grep NODE_OPTIONS ~/.bashrc` → one line, `--max-old-space-size=1536`.
 
 ---
 
@@ -455,10 +459,10 @@ Custom shortcuts captured from current Mint XFCE setup (stored in `~/.config/xfc
 
 ```bash
 mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml
-cp linux-configs/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-keyboard-shortcuts.xml ~/.config/xfce4/xfconf/xfce-perchannel-xml/
+cp xfce/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-keyboard-shortcuts.xml ~/.config/xfce4/xfconf/xfce-perchannel-xml/
 ```
 
-_(Adjust `linux-configs/` to wherever this repo lives on the new laptop)_
+_(Run from the repo root. Or use the full path: `cp /path/to/linux-dotfiles/xfce/.config/...` — or just `bash xfce/setup.sh`, which does this for you.)_
 
 2. Log out and back in (or restart) for the shortcuts to load.
 
@@ -614,10 +618,10 @@ All checked apps above are **system defaults** — on a fresh Mint XFCE install 
 
 ```bash
 mkdir -p ~/.config/autostart
-cp linux-configs/.config/autostart/*.desktop ~/.config/autostart/
+cp xfce/.config/autostart/*.desktop ~/.config/autostart/
 ```
 
-_(Adjust `linux-configs/` to wherever this repo lives on the new laptop)_
+_(Run from the repo root. Or use the full path — or just `bash xfce/setup.sh`, which does this for you.)_
 
 2. Log out and back in for the changes to take effect.
 
@@ -672,14 +676,14 @@ Restarts the panel process and applies the updated CSS stylesheet immediately wi
 
 ### How to Restore on New Laptop
 
-The GTK CSS file is already saved in this repo at `.config/gtk-3.0/gtk.css`. Copy it into place:
+The GTK CSS file is already saved in this repo at `xfce/.config/gtk-3.0/gtk.css`. Copy it into place:
 
 ```bash
 mkdir -p ~/.config/gtk-3.0
-cp linux-configs/.config/gtk-3.0/gtk.css ~/.config/gtk-3.0/
+cp xfce/.config/gtk-3.0/gtk.css ~/.config/gtk-3.0/
 ```
 
-_(Adjust `linux-configs/` to wherever this repo lives on the new laptop)_
+_(Run from the repo root. Or use the full path — or just `bash xfce/setup.sh`, which does this for you.)_
 
 Then reload the panel:
 
@@ -782,15 +786,17 @@ rm -rf ~/rofi-community-themes
 Skip if you did 10A. This copies pre-configured files from the repo into your home directory.
 
 ```bash
-REPO=/home/julry/vscodefiles/linux-configs
+REPO=/path/to/linux-dotfiles/xfce
 
 # Copy launcher (type-3, style-3, Gruvbox palette, WhiteSur icons)
 cp -r "$REPO/.config/rofi/launchers/type-3" ~/.config/rofi/launchers/type-3/
 cp -r "$REPO/.config/rofi/colors/gruvbox.rasi" ~/.config/rofi/colors/
 cp "$REPO/.config/rofi/config.rasi" ~/.config/rofi/
 
-# Install fonts
-cp "$REPO/.local/share/fonts/"*.ttf ~/.local/share/fonts/
+# Install fonts (vendored in common/, shared by all three DEs — gnome/ and cosmic/
+# setup.sh copy the same tree, so kitty/fastfetch/starship get Nerd Font everywhere)
+mkdir -p ~/.local/share/fonts
+cp -r "$REPO/common/.local/share/fonts/." ~/.local/share/fonts/
 fc-cache -f
 
 # Bind Super+R
@@ -887,11 +893,13 @@ curl -sS https://starship.rs/install.sh | sh -s -- -y
 ### 9E. Hook Starship into Bash
 
 ```bash
-echo 'eval "$(starship init bash)"' >> ~/.bashrc
+# Do NOT append to ~/.bashrc here — common/.bashrc (copied by setup.sh) already carries
+# `eval "$(starship init bash)"` at line 129. Appending here gives you two init hooks.
+cp "$REPO/../common/.bashrc" ~/.bashrc
 source ~/.bashrc
 ```
 
-- Appends the init hook so Starship renders on every new tab/window.
+- Installs the init hook so Starship renders on every new tab/window, by copying the shared file rather than appending.
 
 ### 9F. Gruvbox Powerline Arrow Prompt
 

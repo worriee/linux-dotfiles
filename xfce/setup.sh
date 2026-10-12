@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # setup.sh — One-command restore of this dotfiles repo onto a fresh XFCE install (XFCE-only).
-# Run from inside the cloned repo:  bash xfce-setup/setup.sh
-# Full instructions: xfce-setup/fresh-install.md
+# Run from inside the cloned repo:  bash xfce/setup.sh
+# Full instructions: xfce/fresh-install.md
 
 set -u
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../common" 2>/dev/null && pwd)"
 HOME_DIR="${HOME}"
 OK()   { printf '  \033[32m[ok]\033[0m %s\n' "$*"; }
@@ -61,7 +61,7 @@ echo "==============================================="
 # ------------------------------------------------
 STEP "Fixing hardcoded paths (/home/julry -> $HOME_DIR)"
 _PATH_FILES=()
-for _f in "$REPO/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-keyboard-shortcuts.xml" "$COMMON_DIR/.config/opencode/opencode.jsonc"; do
+for _f in "$REPO/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-keyboard-shortcuts.xml" "$COMMON_DIR/.config/opencode/opencode.jsonc" "$COMMON_DIR/.config/fastfetch/config.jsonc"; do
     [ -f "$_f" ] && _PATH_FILES+=("$_f")
 done
 if [ "$HOME_DIR" = "/home/julry" ]; then
@@ -89,9 +89,13 @@ unset _f _PATH_FILES
 # 2. Packages (sudo) — per-distro list, installed via pkg helpers
 # ------------------------------------------------
 if [ "$DISTRO" = "opensuse" ]; then
+    # Refresh metadata once. The per-package probe below is then a pure cache read
+    # (/var/cache/zypp/raw is world-readable), so it must NOT re-run `sudo zypper`
+    # per package — that re-does the full refresh and re-prompts N times.
+    sudo zypper -n ref >/dev/null 2>&1 || true
     STEP "Checking package availability (zypper dry-check)"
     for _pkg in rofi flameshot picom fastfetch kitty earlyoom lightdm-slick-greeter zram-generator gcc make kernel-default-devel curl xrandr; do
-        if sudo zypper se -x --match-exact "$_pkg" >/dev/null 2>&1; then OK "$_pkg found"
+        if zypper se -x --match-exact "$_pkg" >/dev/null 2>&1; then OK "$_pkg found"
         else WARN "$_pkg not found in repos — install still attempted for the rest"; FAILED_STEPS+=("pkg missing: $_pkg"); fi
     done
     unset _pkg
@@ -182,9 +186,38 @@ fi
 # .icons is intentionally NOT vendored — the WhiteSur theme is ~187MB / 43k files and
 # was dropped from the repo to keep clones small. Install it from upstream instead:
 # see setup.md Section 0. Nothing to copy here.
-[ -d "$REPO/.local/share/fonts" ] && cp -rb "$REPO/.local/share/fonts/." "$HOME_DIR/.local/share/fonts/" || WARN "fonts missing — skipped"
+
+# Shared assets used by all three DEs (see the same block in gnome/setup.sh for why
+# these are not XFCE-only): Nerd Fonts, the fastfetch logo, the wallpaper.
+if [ -d "$COMMON_DIR/.local" ]; then
+    mkdir -p "$HOME_DIR/.local/share"
+    if cp -rb "$COMMON_DIR/.local/." "$HOME_DIR/.local/"; then OK "Nerd Fonts -> $HOME_DIR/.local/share/fonts"
+    else WARN "common/.local copy failed"; FAILED_STEPS+=("fonts"); fi
+else
+    WARN "common/.local missing — Nerd Fonts skipped"
+fi
+if [ -f "$COMMON_DIR/assets/jm-icon.png" ]; then
+    mkdir -p "$HOME_DIR/Documents"
+    if cp -b "$COMMON_DIR/assets/jm-icon.png" "$HOME_DIR/Documents/jm-icon.png" 2>/dev/null; then
+        OK "icon -> $HOME_DIR/Documents/jm-icon.png (fastfetch)"
+    else
+        WARN "icon copy failed"; FAILED_STEPS+=("fastfetch logo")
+    fi
+else
+    WARN "common/assets/jm-icon.png missing — fastfetch logo skipped"; FAILED_STEPS+=("logo missing")
+fi
+if [ -d "$COMMON_DIR/wallpapers" ]; then
+    mkdir -p "$HOME_DIR/wallpapers"
+    if cp -rb "$COMMON_DIR/wallpapers/." "$HOME_DIR/wallpapers/"; then OK "wallpaper -> $HOME_DIR/wallpapers"
+    else WARN "common/wallpapers copy failed"; FAILED_STEPS+=("wallpaper"); fi
+    # picked up again by the slick-greeter step below
+    _WL_SRC="$(find "$HOME_DIR/wallpapers" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.png' \) 2>/dev/null | head -n 1)"
+else
+    WARN "common/wallpapers missing — wallpaper skipped"
+    _WL_SRC=""
+fi
 fc-cache -f >/dev/null 2>&1
-OK "dotfiles + fonts applied (backups: <file>~)"
+OK "dotfiles + shared assets applied (backups: <file>~)"
 
 # Screen dim toggle script (keybind restores from the xfconf XML above)
 STEP "Screen dim toggle script (Super+Alt+B)"
@@ -224,11 +257,14 @@ fi
 # 4. Login screen — slick-greeter (sudo)
 # ------------------------------------------------
 STEP "Login screen (slick-greeter)"
-if [ -f "$REPO/background.jpg" ]; then
+# The greeter wallpaper is the shared one from common/wallpapers/. It used to point at
+# xfce/background.jpg, which no longer exists in the repo — the greeter config was
+# written unconditionally and printed OK anyway (REVIEW-028).
+if [ -n "${_WL_SRC:-}" ]; then
     sudo mkdir -p /usr/share/backgrounds
-    sudo cp "$REPO/background.jpg" /usr/share/backgrounds/background.jpg && OK "wallpaper -> /usr/share/backgrounds/background.jpg"
+    sudo cp "$_WL_SRC" /usr/share/backgrounds/background.jpg && OK "greeter wallpaper -> /usr/share/backgrounds/background.jpg"
 else
-    WARN "$REPO/background.jpg missing — wallpaper skipped (see setup.md Section 7)"; FAILED_STEPS+=("wallpaper missing")
+    WARN "no wallpaper found in common/wallpapers — greeter keeps its default background"
 fi
 sudo tee /etc/lightdm/slick-greeter.conf >/dev/null <<'EOF'
 [Greeter]
@@ -283,19 +319,21 @@ if [ "$DISTRO" = "opensuse" ]; then
     # Post-state is asserted via zramctl — never assumed.
     if grep -q "zram-size = min(ram)" /etc/systemd/zram-generator.conf 2>/dev/null \
         && grep -q "compression-algorithm = zstd" /etc/systemd/zram-generator.conf 2>/dev/null \
-        && zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
+        && /usr/sbin/zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
         OK "zram already configured (zstd, 100% RAM, active)"
     else
         # Park the legacy script-based service if present (avoids double zram devices)
         sudo systemctl disable --now zramswap >/dev/null 2>&1 || true
         if printf '[zram0]\nzram-size = min(ram)\ncompression-algorithm = zstd\n' | sudo tee /etc/systemd/zram-generator.conf >/dev/null \
             && sudo systemctl daemon-reload >/dev/null 2>&1 \
-            && sudo systemctl enable --now systemd-zram-setup@zram0.service >/dev/null 2>&1 \
-            && sudo systemctl restart dev-zram0.swap >/dev/null 2>&1; then
-            if zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
+            && sudo systemctl enable --now systemd-zram-setup@zram0.service >/dev/null 2>&1; then
+            # No `systemctl restart dev-zram0.swap`: restarting the unit does not
+            # recreate /dev/zram0 with the new settings. A reboot activates them;
+            # the `rest` alias is the user's manual way to do that.
+            if /usr/sbin/zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
                 OK "zram configured + active (zstd, 100% RAM, verified via zramctl)"
             else
-                WARN "zram config written but zstd not active — reboot, then check zramctl"; FAILED_STEPS+=("zram verify")
+                WARN "zram config written but not yet active — REBOOT required, then run: zramctl"; FAILED_STEPS+=("zram verify (reboot pending)")
             fi
         else
             WARN "zram config failed — see setup.md Section 11"; FAILED_STEPS+=("zram config")
