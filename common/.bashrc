@@ -120,6 +120,7 @@ export NVM_DIR="$HOME/.config/nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 # opencode
+export PATH="/home/julry/.opencode/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
 
 if [ "$PWD" = "$HOME" ]; then
@@ -135,6 +136,8 @@ alias rest='sudo systemctl restart dev-zram0.swap && sudo systemctl restart disp
 alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: swappiness 10'
 alias code='sudo /usr/sbin/sysctl -w vm.swappiness=180 >/dev/null && echo code: swappiness 180'
 
+eval "$(zoxide init bash)"
+
 #zed + zoxide + fzf aliases
 _launch_and_exit() {
   local target="$1"
@@ -143,16 +146,12 @@ _launch_and_exit() {
   exit 0
 }
 
-zzed() {
-  if [ "$1" = "-i" ]; then
+zzi() {
+  if [ $# -eq 0 ] || [ "$1" = "-i" ]; then
     local target
-    target="$(zoxide query -i "${@:2}")" || return 1
+    [ "$1" = "-i" ] && shift
+    target="$(zoxide query -i "$@")" || return 1
     [ -n "$target" ] && _launch_and_exit "$target"
-    return
-  fi
-
-  if [ $# -eq 0 ]; then
-    _launch_and_exit .
     return
   fi
 
@@ -184,7 +183,7 @@ zzed() {
   if [ -n "$target" ]; then
     _launch_and_exit "$target"
   else
-    echo "zzed: could not find '$*' locally or in zoxide"
+    echo "zzi: could not find '$*' locally or in zoxide"
     return 1
   fi
 }
