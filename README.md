@@ -52,11 +52,6 @@ These files are **byte-identical copies** in `cosmic/`, `gnome/` and `xfce/`. Ed
 | `.config/zed/`                                    | 2 (gnome, xfce) |
 | `.config/opencode/` (config + plugins + skill)    | 1 (common/) |
 
-### Not vendored
-
-- **Icon themes.** `xfce/.icons/` (WhiteSur-grey) was 187 MB across 43,099 files — 98% of the repo — and was removed so clones stay small. `xfce/setup.sh` no longer installs icons. See `xfce/setup.md` §0 for the install step.
-- **Hyprland / ML4W.** Tried and removed. `rpm -q hyprland` → not installed. Do not re-attempt without reason.
-
 ## Getting Started on a New Machine
 
 XFCE (Mint/Ubuntu or openSUSE TW XFCE, details in `xfce/fresh-install.md`):
