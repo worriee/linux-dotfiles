@@ -13,6 +13,9 @@
   },
   "display": {
     "separator": " ",
+    "size": {
+      "binaryPrefix": "jedec",
+    },
     "key": {
       "type": "both-1",
       "width": 0,
