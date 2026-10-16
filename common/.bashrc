@@ -196,3 +196,15 @@ repo() {
     done
   fi
 }
+
+# update opensuse system + flatpak packages in one pass
+sysup() {
+  echo "--- Refresh Repositories ---"
+  sudo zypper ref
+  echo "--- Updating openSUSE Tumbleweed ---"
+  sudo zypper dup
+  echo "--- Updating Flatpaks ---"
+  flatpak update
+  echo "--- Cleanup Flatpak ---"
+  flatpak uninstall --unused
+}
