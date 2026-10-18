@@ -115,6 +115,11 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
+
+
+# down below is my own mods
+
+# nvm
 export NVM_DIR="$HOME/.config/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
@@ -123,17 +128,24 @@ export NVM_DIR="$HOME/.config/nvm"
 export PATH="/home/julry/.opencode/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
 
+# ani-cli download folder
+export ANI_CLI_DOWNLOAD_DIR="$HOME/Videos/ani-cli"
+
+# run fastfetch only if in home dir
 if [ "$PWD" = "$HOME" ]; then
     fastfetch
 fi
 
+# dir prompt ui in kitty or other term
 eval "$(starship init bash)"
 
-export NODE_OPTIONS="--max-old-space-size=1536"
-
+# zoxide pkg (cd alternative)
 eval "$(zoxide init bash)"
 
-#zed + zoxide + fzf aliases
+# some node optimization
+export NODE_OPTIONS="--max-old-space-size=1536"
+
+# zed + zoxide + fzf aliases
 _launch_and_exit() {
   local target="$1"
   nohup zed "$target" >/dev/null 2>&1 &
@@ -141,6 +153,7 @@ _launch_and_exit() {
   exit 0
 }
 
+# run zoxide + fzf + zed ide
 zzi() {
   if [ $# -eq 0 ] || [ "$1" = "-i" ]; then
     local target
@@ -183,7 +196,8 @@ zzi() {
   fi
 }
 
-# command: repo ref //refreshes the /home/julry/repo folders to add them in zzed -i ui
+# command: repo ref
+# refreshes the /home/julry/repo folders to add them in zzed -i ui
 repo() {
   if [ "$1" = "ref" ]; then
     for d in "$HOME/repo"/*/; do
@@ -204,7 +218,7 @@ sysup() {
   sudo zypper dup
 }
 
-#Some alias of mine
+# Some alias in this section
 
 # Flush the ZRAM compressed pool and restart the graphical desktop session
 alias rest='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager'
@@ -212,4 +226,3 @@ alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: s
 alias code='sudo /usr/sbin/sysctl -w vm.swappiness=180 >/dev/null && echo code: swappiness 180'
 alias sepkg='zypper se -i | grep '^i+''
 alias sepkgfull='zypper se -i'
-
