@@ -119,12 +119,12 @@ fi
 
 # down below is my own mods
 
-# nvm
+# nvm init
 export NVM_DIR="$HOME/.config/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
-# opencode
+# opencode init
 export PATH="/home/julry/.opencode/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -139,13 +139,14 @@ fi
 # dir prompt ui in kitty or other term
 eval "$(starship init bash)"
 
-# zoxide pkg (cd alternative)
+# zoxide pkg init (cd alternative)
 eval "$(zoxide init bash)"
 
 # some node optimization
 export NODE_OPTIONS="--max-old-space-size=1536"
 
-# zed + zoxide + fzf aliases
+# run zoxide + fzf + zed ide
+# command: zzi
 _launch_and_exit() {
   local target="$1"
   nohup zed "$target" >/dev/null 2>&1 &
@@ -153,7 +154,6 @@ _launch_and_exit() {
   exit 0
 }
 
-# run zoxide + fzf + zed ide
 zzi() {
   if [ $# -eq 0 ] || [ "$1" = "-i" ]; then
     local target
@@ -207,6 +207,7 @@ repo() {
 }
 
 # update opensuse system + flatpak packages in one pass
+# command: sysup
 sysup() {
   echo "--- Refresh Repositories ---"
   sudo zypper ref
@@ -226,3 +227,4 @@ alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: s
 alias code='sudo /usr/sbin/sysctl -w vm.swappiness=180 >/dev/null && echo code: swappiness 180'
 alias sepkg='zypper se -i | grep '^i+''
 alias sepkgfull='zypper se -i'
+alias ani='mpv "$(find ~/Videos/ani-cli -type f \( -name "*.mp4" -o -name "*.mkv" \) | sort -V | fzf --layout=reverse)"'
