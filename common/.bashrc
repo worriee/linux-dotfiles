@@ -131,11 +131,6 @@ eval "$(starship init bash)"
 
 export NODE_OPTIONS="--max-old-space-size=1536"
 
-# Flush the ZRAM compressed pool and restart the graphical desktop session
-alias rest='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager'
-alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: swappiness 10'
-alias code='sudo /usr/sbin/sysctl -w vm.swappiness=180 >/dev/null && echo code: swappiness 180'
-
 eval "$(zoxide init bash)"
 
 #zed + zoxide + fzf aliases
@@ -208,3 +203,13 @@ sysup() {
   echo "--- Updating openSUSE Tumbleweed ---"
   sudo zypper dup
 }
+
+#Some alias of mine
+
+# Flush the ZRAM compressed pool and restart the graphical desktop session
+alias rest='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager'
+alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: swappiness 10'
+alias code='sudo /usr/sbin/sysctl -w vm.swappiness=180 >/dev/null && echo code: swappiness 180'
+alias sepkg='zypper se -i | grep '^i+''
+alias sepkgfull='zypper se -i'
+
