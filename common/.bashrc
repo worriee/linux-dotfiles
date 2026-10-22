@@ -236,5 +236,3 @@ alias sessions='sessions.sh'
 alias sessions-log='cat /home/julry/.local/state/sessions.log'
 # open crontab with zed
 alias cron='EDITOR="zed --wait" crontab -e'
-
-# automation test
