@@ -1,5 +1,9 @@
 [/]
 custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/']
+reboot=['<Shift><Super>r']
+rotate-video-lock-static=['<Super>o', 'XF86RotationLockToggle']
+screensaver=@as []
+shutdown=@as []
 
 [custom-keybindings/custom0]
 binding='<Super>Return'
@@ -13,16 +17,15 @@ name='Files'
 
 [custom-keybindings/custom2]
 binding='<Super>z'
-command='flatpak run dev.zed.Zed'
+command='zed'
 name='Zed'
 
 [custom-keybindings/custom3]
 binding='<Super>b'
-command='flatpak run com.brave.Browser'
+command='brave-browser'
 name='Brave'
 
 [custom-keybindings/custom4]
 binding='<Control><Shift>Escape'
 command='gnome-system-monitor'
 name='System Monitor'
-

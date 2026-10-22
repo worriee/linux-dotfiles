@@ -1,3 +1,4 @@
 [/]
-toggle-tiled-left=['<Super>Left', '<Super>KP_Left']
-toggle-tiled-right=['<Super>Right', '<Super>KP_Right']
+cancel-input-capture=['<Super><Shift>Escape']
+toggle-tiled-left=@as []
+toggle-tiled-right=@as []

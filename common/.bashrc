@@ -221,10 +221,18 @@ sysup() {
 
 # Some alias in this section
 
-# Flush the ZRAM compressed pool and restart the graphical desktop session
+# restart + flush ram & zram
 alias rest='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager'
 alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: swappiness 10'
 alias code='sudo /usr/sbin/sysctl -w vm.swappiness=180 >/dev/null && echo code: swappiness 180'
 alias sepkg='zypper se -i | grep '^i+''
 alias sepkgfull='zypper se -i'
 alias ani='mpv "$(find ~/Videos/ani-cli -type f \( -name "*.mp4" -o -name "*.mkv" \) | sort -V | fzf --layout=reverse)"'
+alias orgz='organize.sh'
+alias orgz-log='cat /home/julry/.local/state/organize.log'
+alias dots='dots.sh'
+alias dots-log='cat /home/julry/.local/state/dots.log'
+alias sessions='sessions.sh'
+alias sessions-log='cat /home/julry/.local/state/sessions.log'
+# open crontab with zed
+alias cron='EDITOR="zed --wait" crontab -e'

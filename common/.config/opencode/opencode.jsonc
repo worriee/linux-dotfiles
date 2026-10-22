@@ -4,6 +4,14 @@
     "auto": true,
     "tail_turns": 10,
   },
+  "mcp": {
+    "figma": { "type": "remote", "url": "https://mcp.figma.com/mcp" },
+    "penpot": {
+      "type": "remote",
+      "url": "https://design.penpot.app/mcp/stream?userToken=eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2R0NNIn0.HVkwBlIYrK-Z8283HbK8hytRgWkNybU_STPBpixbrOLZn4u7dQsR_g.f_bBt7LdgijfLpbA.L4bgdX9ykS3Po6khdz-EDaOHwiblyy4TOlID2E_Qxcrf65RqWRnEV809me8nBrwvc3ATiL-iLY307ajIGoS4ptu8jGRpXEjlHNlC2W_twz55naGe-Cz37js0sbPXsZzept_HwW-vzbz19zRRqy_dGuLGYDMnwUz19e3q8kAGci-sxmhnLMP3RsCsY0cRE5Bbqmq6Xrl7a_7b5yRIUt7Vig8.xn9BaHSExHv4LmMV-Cd6oA",
+      "enabled": true
+    }
+  },
   "plugin": [
     "@dietrichgebert/ponytail"
   ]
