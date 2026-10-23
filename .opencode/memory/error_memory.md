@@ -2,7 +2,7 @@
 
 ## 0. Last Synchronized Checkpoint
 
-- **Last Error Check**: October 11, 2026, 05:15 PM PST
+- **Last Error Check**: October 23, 2026, 08:15 AM PST
 
 ## 1. Active & Unresolved Errors
 
@@ -33,6 +33,12 @@ _List errors currently blocking development. Update this section immediately whe
 ## 2. Historical & Resolved Errors
 
 _Move errors to this section once they are completely verified as fixed. This serves as historical memory to prevent the AI from re-introducing the same bugs._
+
+### [RESOLVED] dots.sh sync_rsync wrapper bypass + missing rsync `--delete` on mirror lanes (ERR-006)
+
+- **The Issue**: `dots` run of Oct 23, 2026, 8:09 AM printed two raw rsync itemize lines (` .d.t...... ./`, `>f.st...... bg5.jpg`) above the summary and reported `synced: 0 files` although `bg5.jpg` had just synced (live bg5 deleted + bg6 renamed → bg5). Separately, `common/wallpapers/bg6.jpg` stayed in the repo after the live deletion — deletion was never propagated (design: "stale drift tolerated", overruled by owner).
+- **The Resolution**: Two fixes inside `~/.local/bin/dots.sh` (build Oct-22 talk-back) and one in `sessions.sh`: (1) the remaining two unwrapped lanes — `~/Pictures/jm-icon.png` and `~/Pictures/wallpapers/` — are routed through the counting wrapper `sync_rsync()` so their itemize output is consumed and their changed/deleted files are counted (leak + zero-count both eliminated); (2) `--delete` added to all mirror lanes (`RS=(-a -i --delete --exclude='*~' --exclude='.gitignore')`) plus the `sessions.sh` scripts mirror (`rsync -ai --delete --include='*.sh' --exclude='*'`), so live deletions propagate to the repo and get committed by the same run; `.gitignore` exclusions protect repo-side protector files (e.g. `common/.config/spotatui/.gitignore`, identical on both sides) from being swept. The script talk-back gains a `removed: N files (names)` segment, shown only when deletions occur. Verified October 23, 2026, 08:23 AM PST — repo-side planted stale file was swept by `--delete`, leaked lines gone, deletion committed by the run itself.
+- **Prevention Strategy**: When a wrapper utility is introduced for one set of call sites, enumerate every call site of the wrapped command and convert them all in the same pass — two orphaned `rsync` lines sat below the wrapper chain and silently skipped both counting and output capture. When "mimic the live system" semantics are requested for a mirror, remember rsync never deletes by default: `--delete` plus a protector-exclusion list for files that exist only on the destination side is the standard shape.
 
 ### [RESOLVED] caveman rebuilt as a local OpenCode v2 plugin (ERR-002)
 
