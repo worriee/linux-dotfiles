@@ -2,7 +2,7 @@
 
 ## 0. Last Synchronized Checkpoint
 
-- **Last Error Check**: October 23, 2026, 08:15 AM PST
+- **Last Error Check**: October 23, 2026, 09:06 AM PST
 
 ## 1. Active & Unresolved Errors
 
@@ -33,6 +33,12 @@ _List errors currently blocking development. Update this section immediately whe
 ## 2. Historical & Resolved Errors
 
 _Move errors to this section once they are completely verified as fixed. This serves as historical memory to prevent the AI from re-introducing the same bugs._
+
+### [RESOLVED] sessions.sh exported frozen legacy-table content with bumped Updated headers + clone-churn eviction (ERR-007)
+
+- **The Issue**: Owner caught the exports "preserving the last session and just updating its timestamp" — confirmed exactly, twice over. (1) **Wrong storage generation**: `opencode serve --service` (pid on `opencode.db`, holds db + 4.2 MB WAL) migrated live message storage into sibling tables — `session_message` (7,778 rows, everything back to Aug-13) and `session_v2` — while the script's `message`/`part` queries read the orphaned legacy generation frozen at ~Oct-11 (5,459 rows; the live session had only 43 legacy rows vs 1,081 live ones). Effective failure: linux-dotfiles exports rendered a frozen ~Oct-11 corpse under a truthfully-current `Updated:` header, and post-Oct-11 projects (general ×2, sflabact1) exported as 151–153-byte header-only stubs. Raw-token proof at diagnosis time: today's exact words hit 38× inside `opencode.db-wal` bytes, 0× in `message`. (2) **Dedupe by (Session ID + Updated header)** made every run spawn a clone file for the growing session; cap-5 rotation then evicted the true Sep-30 archive session (`ses_f0e18b71…`, 549 messages) into rotated-sessions.txt, leaving linux-dotfiles as 5 snapshots of one id.
+- **The Resolution**: Lane 1 rebuilt in `~/.local/bin/sessions.sh` (verified October 23, 2026, 09:06 AM PST): renders each top-level session from the live `session_message` store (types `user`/`assistant` only, ordered by `seq`; assistant `content` maps text/reasoning/tool items into the TUI /export shape; empty rows skipped); **one canonical file per session id** — dedupe by Session ID alone, refresh in place when the content sha-256 changes, file re-named to the export moment, older renames/clones collapsed automatically; cap-5 rotation lane deleted outright (owner decision) and the `rotation:` segment retired; `rotated-sessions.txt` emptied per owner approval, restoring `ses_f0e18b71…` (blacklist-suppression mechanism retained for any future manual entry); tmp-sweep lane routes found `/tmp` exports into the same one-file-per-id refresh (TUI bytes authoritative). First real run: `sessions: 10 exported (my-portfolio, my-workflow, linux-dotfiles +4 more) | scripts: 1 updated (sessions.sh) | git: PUSHED` — linux-dotfiles now 2 files (restored 413 KB archive + 2.35 MB live chat whose newest file contains the diagnosis conversation itself, token-verified), stubs cured (general 301 KB/181 KB, sflabact1 230 KB), zero clones, zero rotation.
+- **Prevention Strategy**: When a daemon keeps ONE SQLite file but multiple schema generations coexist (`session_v2`/`session_message` vs legacy `session`/`message`/`part`), schema resemblance lies — data visibly present in the file does not mean the queried table holds it. Prove freshness before trusting a source: grep a fresh text token against raw file bytes AND run a LIKE hunt across every table/column, plus check `/proc/<pid>/fd` for what the live process actually holds open. For refresh-style exporters, dedupe by stable identity (id), never by mutable stamps, and prefer content-hash refresh over append-on-change so live growth rewrites one file instead of spawning clones that an eviction policy must later kill.
 
 ### [RESOLVED] dots.sh sync_rsync wrapper bypass + missing rsync `--delete` on mirror lanes (ERR-006)
 
