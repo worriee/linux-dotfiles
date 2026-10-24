@@ -108,7 +108,7 @@
     {
       "type": "packages",
       "key": "packages",
-      "format": "{rpm} (zypper), {flatpak-all} (flatpak)",
+      "format": "{rpm} (rpm), {flatpak-all} (flatpak)",
     },
     {
       "type": "battery",
