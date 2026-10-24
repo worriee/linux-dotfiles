@@ -1,0 +1,9 @@
+[Unit]
+Description=Evening backup chain: organize.sh + dots.sh + sessions.sh
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/organize.sh
+ExecStart=%h/.local/bin/dots.sh
+ExecStart=%h/.local/bin/sessions.sh
+TimeoutStartSec=15min
