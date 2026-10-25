@@ -235,3 +235,5 @@ alias sessions-log='cat /home/julry/.local/state/sessions.log'
 alias bak='dots.sh && sessions.sh'
 # open crontab with zed
 alias cron='EDITOR="zed --wait" crontab -e'
+alias phone='nautilus "$(ls -d /run/user/1000/gvfs/sftp:*/storage/emulated/0 2>/dev/null | head -1)"'
+alias phonecd='cd "$(ls -d /run/user/1000/gvfs/sftp:*/storage/emulated/0 2>/dev/null | head -1)"'
