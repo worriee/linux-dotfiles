@@ -2,11 +2,28 @@
 
 ## 0. Last Synchronized Checkpoint
 
-- **Last Error Check**: October 23, 2026, 09:06 AM PST
+- **Last Error Check**: October 25, 2026, 02:38 PM PST
 
 ## 1. Active & Unresolved Errors
 
 _List errors currently blocking development. Update this section immediately when a new error occurs during execution or user prompting._
+
+### [ERR-008] Orange disc in the panel during phone Remote Input — owned by GNOME Shell, not GSConnect
+
+- **Symptom**: While the phone has Remote Input active (user typing/steering the laptop from the KDE Connect app), a small solid colored disc appears in the top panel next to the status icons and stays for the whole session. Owner finds it jarring in the themed dark panel.
+- **Context/Trigger**: Wayland session; GNOME 4x on Tumbleweed; GSConnect paired phone (dconf `last-connection='lan://172.26.126.86:1716'`). Trigger = opening/using the Remote Input feature on the phone.
+- **Root Cause**: The mousepad/virtual-input plugin goes through the freedesktop RemoteDesktop portal on Wayland (via Mutter's libei/EI-based remote access — busctl also shows `org.gnome.Mutter.RemoteDesktop` up from the currently running session). GNOME Shell therefore shows its native screen-remote indicator while the session is open; the top-bar pill is themed as `#panel .panel-button.screen-sharing-indicator { … background-color: st-mix…(-st-accent-color…) }` (theme css tracked via `/tmp/opencode/shell-theme.css` extraction, selector at lines 1840–1870). So the orange disc is the system's accent color pill painted by GNOME Shell's own theme:
+    - it is NOT a GSConnect stylesheet choice: the extension's `stylesheet.css` paints nothing on the panel (already verified), and
+    - GSConnect exposes no styling/dconf toggle for the indicator (grep of the extension folder shows only `system-status-icon gsconnect-device-indicator` with `-st-icon-style: symbolic` and no bg color set), and
+    - the extension is not sourcing the orange glyph — its bundled icons are all `-symbolic.svg` monotone phone shapes kept strictly by `-st-icon-style: symbolic`.
+- **Options (owner decision pending)**:
+  1. Make the session end sooner: session ends as soon as the app stops <Method>remote input</Method>; negligible.
+  2. Style-workaround: install `gnome-shell-extensions` package → enable `user-theme` → drop an override css of `#panel .panel-button.screen-sharing-indicator` with `background-color: transparent`. Downside: also hides a benign-but-real security signal (something is controlling input right now).
+  3. Use an X11 GNOME session for the laptop: GSConnect inputs via forced keyboard without the portal on X11, so the pill never appears. Downside: session-type change, not a styling fix.
+- **Evidence trace**: `/usr/share/gnome-shell/gnome-shell-theme.gresource` → light/dark css selected at runtime (stylesheet still paints the pill even in dark theme); system `gnome-shell-dbus-interfaces.gresource`; the phone session started only after the firewall-port fix (the pill only appears with a session). All trees probed read-only; no live changes made.
+- **Status**: Diagnosed. Fix not applied — awaiting owner pick among options 1/2/3 (or accept-as-is). Log modified per findings gate.
+
+---
 
 ### [ERR-005] Prompt regression — `$username` + `[username]` broke the styled segment and broke out of Section 1's colour ramp
 
