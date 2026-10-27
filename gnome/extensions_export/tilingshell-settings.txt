@@ -1,0 +1,25 @@
+[/]
+active-screen-edges=false
+cycle-layouts-backward=['<Shift>']
+edge-tiling-mode='default'
+enable-autotiling=true
+enable-blur-snap-assistant=false
+enable-smart-window-border-radius=true
+enable-snap-assist=true
+enable-window-border=true
+focus-window-down=['<Super>j']
+focus-window-left=['<Super>h']
+focus-window-right=['<Super>l']
+focus-window-up=['<Super>k']
+inner-gaps=uint32 4
+move-window-center=['<Super>c']
+outer-gaps=uint32 4
+selected-layouts=[['Layout 3'], ['Layout 3'], ['Layout 3'], ['Layout 3'], ['Layout 3']]
+show-indicator=false
+snap-assist-sync-layout=false
+span-window-all-tiles=['<Alt>f']
+span-window-down=['<Shift><Super>j']
+span-window-left=['<Shift><Super>h']
+span-window-right=['<Shift><Super>l']
+span-window-up=['<Shift><Super>k']
+window-use-custom-border-color=false
