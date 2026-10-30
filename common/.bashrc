@@ -216,7 +216,7 @@ eval "$(zoxide init bash)"
 # some node optimization
 export NODE_OPTIONS="--max-old-space-size=1536"
 
-# run zoxide + fzf + zed ide
+# zoxide + fzf + zed
 _launch_and_exit() {
   local target="$1"
   nohup zed "$target" >/dev/null 2>&1 &
@@ -224,7 +224,7 @@ _launch_and_exit() {
   exit 0
 }
 
-# jump with zoxide, open pick in zed
+# run fzf picker ui then launch zed
 zzi() {
   if [ $# -eq 0 ] || [ "$1" = "-i" ]; then
     local target
@@ -268,7 +268,7 @@ zzi() {
 }
 
 # command: repo ref
-# refreshes the /home/julry/repo folders to add them in zzed -i ui
+# refreshes the /home/julry/repo path for zzi picker
 repo() {
   if [ "$1" = "ref" ]; then
     for d in "$HOME/repo"/*/; do
