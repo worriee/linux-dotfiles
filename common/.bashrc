@@ -119,6 +119,77 @@ fi
 
 # down below is my own mods
 
+# ── h : my cheat sheet + fzf picker (append-only block; delete whole block to uninstall) ──
+# h       list: aliases + functions below the marker comment, with descriptions
+# Ctrl+O  fzf picker -> command is TYPED at prompt (never runs it)
+# future: describe by comment above the line
+
+_h_rows() {
+  local -r file="$HOME/.bashrc"
+  local -r marker='# down below is my own mods'
+  local raw n value gl above desc c m win
+  m=$(grep -nF -- "$marker" "$file" | head -1 | cut -d: -f1)
+  win=1; [ -n "$m" ] && win=$((m+1))
+  w=$(awk -v s="$win" '
+    $0 ~ /^[ \t]*alias[ \t]+[A-Za-z_][A-Za-z0-9_-]*=/ {
+      name=$0; sub(/^[ \t]*alias[ \t]+/,"",name); sub(/=.*/,"",name); print length(name)
+    }
+    $0 ~ /^[ \t]*(function[ \t]+)?[A-Za-z_][A-Za-z0-9_-]*[ \t]*\(\)/ {
+      name=$0; sub(/^[ \t]*(function[ \t]+)?/,"",name); sub(/[ \t]*\(\).*/,"",name);
+      if (name!="h" && name!="_h_rows" && name!="_h_fzf" && name!="_launch_and_exit") print length(name)
+    }' "$file" | sort -rn | head -1)
+  : "${w:=14}"; [ "$w" -lt 14 ] && w=14
+  while IFS= read -r raw; do
+    n=""
+    if [[ $raw =~ ^[[:space:]]*alias[[:space:]]+([A-Za-z_][A-Za-z0-9_-]*)= ]]; then
+      n=${BASH_REMATCH[1]}
+    elif [[ $raw =~ ^[[:space:]]*(function[[:space:]]+)?([A-Za-z_][A-Za-z0-9_-]*)[[:space:]]*\(\) ]]; then
+      n=${BASH_REMATCH[2]}
+    fi
+    case $n in ""|h|_h_rows|_h_fzf|_launch_and_exit) continue ;; esac
+    if [[ $raw == *'='* ]]; then
+      value=${raw#*=}; value=${value#\'}; value=${value%\'}
+      case $value in \"*) value=${value#\"}; value=${value%\"} ;; esac
+    else
+      value="$n"
+    fi
+    desc="$value"
+    if [[ $raw == *'#?'* ]]; then
+      desc=${raw##*'#?'}
+    else
+      gl=$(grep -nF -- "$raw" "$file" | head -1 | cut -d: -f1)
+      if [ "$gl" -gt 1 ]; then
+        above=$(sed -n "$((gl-1))p" "$file")
+        if [[ $above == *([[:space:]])'#'* ]]; then
+          c=${above##*'#'}
+          c=$(sed -e 's/^-*\s*//; s/\s*-*\s*$//; s/\s*$//' <<<"$c")
+          [ -n "$c" ] && desc="$c"
+        fi
+      fi
+    fi
+    [ -z "$desc" ] && desc=$(declare -f "$n" 2>/dev/null | grep -m1 '^[[:space:]]*#' | sed 's/^[[:space:]]*#\+\s*//')
+    printf '%-*s\t%s\t%s\n' "$((w+1))" "$n" "${desc%%[[:space:]]}" "$value"
+  done < <(tail -n +"$win" "$file")
+}
+
+h() {
+  local rows w
+  rows=$(_h_rows)
+  w=$(printf '%s\n' "$rows" | cut -f1 | awk '{ s=length($0); if (s>m) m=s } END { print m }')
+  : "${w:=13}"
+  printf '%-*s\n' "$w" 'ALIASES'
+  printf '%s\n' "$rows" | awk -F'\t' '{ t=$1; gsub(/^ +| +$/, "", t); if (t != $3) print }' | while IFS=$'\t' read -r n d v; do
+    printf '%-*s→ %s\n' "$w" "$n" "$d"
+  done
+  printf '\n%-*s\n' "$w" 'FUNCTIONS'
+  printf '%s\n' "$rows" | awk -F'\t' '{ t=$1; gsub(/^ +| +$/, "", t); if (t == $3) print }' | while IFS=$'\t' read -r n d v; do
+    printf '%-*s→ %s\n' "$w" "$n" "$d"
+  done
+  printf '\n%-*s\n\n' "$w" 'Commands:'
+  printf 'h = print alias/functions • Ctrl+O = fzf menu\n\n'
+  }
+bind -x '"\C-o": _hsel=$(_h_rows | fzf --delimiter '\''\t'\'' --with-nth=1,2 --reverse --cycle --header='\''name ─ description  (Esc=cancel)'\'' --height=55% | cut -f3); [[ $_hsel ]] && READLINE_LINE="$_hsel " && READLINE_POINT=${#READLINE_LINE}; unset _hsel'
+
 # nvm init
 export NVM_DIR="$HOME/.config/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
@@ -154,6 +225,7 @@ _launch_and_exit() {
   exit 0
 }
 
+# jump with zoxide, open pick in zed
 zzi() {
   if [ $# -eq 0 ] || [ "$1" = "-i" ]; then
     local target
@@ -207,7 +279,6 @@ repo() {
 }
 
 # update opensuse system + flatpak packages in one pass
-# command: sysup
 sysup() {
   echo "--- Refresh Repositories ---"
   sudo zypper ref
@@ -287,17 +358,29 @@ verify-bypass-dito() {
 
 # restart + flush ram & zram
 alias rest='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager'
+# gaming mode: swappiness 10
 alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: swappiness 10'
+# coding mode: swappiness 180
 alias code='sudo /usr/sbin/sysctl -w vm.swappiness=180 >/dev/null && echo code: swappiness 180'
+# list installed packages marked i+
 alias sepkg='zypper se -i | grep '^i+''
+# list all explicitly installed packages
 alias sepkgfull='zypper se -i'
+# fzf-pick ani-cli episode, play in mpv
 alias ani='mpv "$(find ~/Videos/ani-cli -type f \( -name "*.mp4" -o -name "*.mkv" \) | sort -V | fzf --layout=reverse)"'
+# sort files via organize.sh
 alias orgz='organize.sh'
+# read organize.sh log
 alias orgz-log='cat /home/julry/.local/state/organize.log'
+# read dots.sh log
 alias dots-log='cat /home/julry/.local/state/dots.log'
+# read sessions.sh log
 alias sessions-log='cat /home/julry/.local/state/sessions.log'
+# main backups: dots.sh + sessions.sh
 alias bak='dots.sh && sessions.sh'
 # open crontab with zed
 alias cron='EDITOR="zed --wait" crontab -e'
+# open phone storage in nautilus
 alias phone='nautilus "$(ls -d /run/user/1000/gvfs/sftp:*/storage/emulated/0 2>/dev/null | head -1)"'
+# cd into phone storage
 alias phonecd='cd "$(ls -d /run/user/1000/gvfs/sftp:*/storage/emulated/0 2>/dev/null | head -1)"'
