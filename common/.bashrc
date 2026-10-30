@@ -188,7 +188,7 @@ h() {
   printf '\n%-*s\n\n' "$w" 'Commands:'
   printf 'h = print alias/functions • Ctrl+O = fzf menu\n\n'
   }
-bind -x '"\C-o": _hsel=$(_h_rows | fzf --delimiter '\''\t'\'' --with-nth=1,2 --reverse --cycle --header='\''name ─ description  (Esc=cancel)'\'' --height=55% | cut -f3); [[ $_hsel ]] && READLINE_LINE="$_hsel " && READLINE_POINT=${#READLINE_LINE}; unset _hsel'
+bind -x '"\C-o": _hsel=$(_h_rows | fzf --delimiter '\''\t'\'' --with-nth=1,2 --reverse --cycle --header='\''name ─ description  (Esc=cancel)'\'' --height=55% | cut -f3); [[ $_hsel ]] && READLINE_LINE="$_hsel" && READLINE_POINT=${#READLINE_LINE}; unset _hsel'
 
 # nvm init
 export NVM_DIR="$HOME/.config/nvm"
@@ -217,7 +217,6 @@ eval "$(zoxide init bash)"
 export NODE_OPTIONS="--max-old-space-size=1536"
 
 # run zoxide + fzf + zed ide
-# command: zzi
 _launch_and_exit() {
   local target="$1"
   nohup zed "$target" >/dev/null 2>&1 &
@@ -278,7 +277,7 @@ repo() {
   fi
 }
 
-# update opensuse system + flatpak packages in one pass
+# update opensuse + flatpak pkgs in one pass
 sysup() {
   echo "--- Refresh Repositories ---"
   sudo zypper ref
