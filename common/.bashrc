@@ -219,6 +219,70 @@ sysup() {
   sudo zypper dup
 }
 
+# --- DITO Hotspot Bypass Helpers ---
+
+# Permanently apply bypass (TTL 65, IPv6 disabled)
+bypass-dito() {
+    echo "Applying permanent DITO bypass settings..."
+    sudo rm -f /etc/sysctl.d/99-default-ttl.conf
+    sudo tee /etc/sysctl.d/99-dito-hotspot.conf >/dev/null << 'EOF'
+net.ipv4.ip_default_ttl = 65
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+EOF
+    sudo sysctl --system >/dev/null
+    sudo dracut --regenerate-all --force
+    echo "Done! Bypass configuration saved to 99-dito-hotspot.conf and rebuilt into boot image."
+}
+
+# Permanently revert to defaults (TTL 64, IPv6 enabled)
+revert-bypass-dito() {
+    echo "Applying permanent system default settings..."
+    sudo rm -f /etc/sysctl.d/99-dito-hotspot.conf
+    sudo tee /etc/sysctl.d/99-default-ttl.conf >/dev/null << 'EOF'
+net.ipv4.ip_default_ttl = 64
+net.ipv6.conf.all.disable_ipv6 = 0
+net.ipv6.conf.default.disable_ipv6 = 0
+EOF
+    sudo sysctl --system >/dev/null
+    sudo dracut --regenerate-all --force
+    echo "Done! Default configuration saved to 99-default-ttl.conf and rebuilt into boot image."
+}
+
+# Verification guide and status check
+verify-bypass-dito() {
+    local ttl=$(cat /proc/sys/net/ipv4/ip_default_ttl 2>/dev/null)
+    local ipv6_disabled=$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null)
+
+    ttl=${ttl:-0}
+    ipv6_disabled=${ipv6_disabled:-0}
+
+    echo "=========================================="
+    echo "       DITO Network Status Check          "
+    echo "=========================================="
+    echo "Active IPv4 TTL      : $ttl"
+    if [ "$ipv6_disabled" -eq 1 ]; then
+        echo "Active IPv6 Status   : Disabled (1)"
+    else
+        echo "Active IPv6 Status   : Enabled (0)"
+    fi
+    echo "------------------------------------------"
+
+    if [ "$ttl" -eq 65 ] && [ "$ipv6_disabled" -eq 1 ]; then
+        echo "Current Mode: [ BYPASSED SETTING ]"
+        echo "  - TTL is 65 (Disguised phone traffic)"
+        echo "  - IPv6 Disabled (Prevents hotspot timeouts)"
+    elif [ "$ttl" -eq 64 ] && [ "$ipv6_disabled" -eq 0 ]; then
+        echo "Current Mode: [ DEFAULT SETTING ]"
+        echo "  - TTL is 64 (Standard Linux default)"
+        echo "  - IPv6 Enabled (Standard Linux default)"
+    else
+        echo "Current Mode: [ CUSTOM / MIXED STATE ]"
+        echo "  - Settings do not match pure bypass or pure default."
+    fi
+    echo "=========================================="
+}
+
 # Some alias in this section
 
 # restart + flush ram & zram
