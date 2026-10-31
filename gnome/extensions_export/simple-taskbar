@@ -944,7 +944,7 @@
     },
     "dock-custom-panel-color-enabled": {
       "type": "b",
-      "value": "false"
+      "value": "true"
     },
     "dock-edge-reveal-enabled": {
       "type": "b",
@@ -952,11 +952,11 @@
     },
     "dock-panel-border-enabled": {
       "type": "b",
-      "value": "false"
+      "value": "true"
     },
     "dock-panel-border-light-enabled": {
       "type": "b",
-      "value": "false"
+      "value": "true"
     },
     "dock-transparency-dynamic-distance": {
       "type": "i",
@@ -968,7 +968,7 @@
     },
     "dock-transparency-level": {
       "type": "i",
-      "value": "20"
+      "value": "80"
     },
     "dock-autohide-reveal-fullscreen": {
       "type": "b",
@@ -980,7 +980,7 @@
     },
     "dock-transparency-on-unmaximized": {
       "type": "b",
-      "value": "true"
+      "value": "false"
     },
     "dock-transparency-dynamic-level": {
       "type": "i",
@@ -1028,7 +1028,7 @@
     },
     "dock-custom-panel-color": {
       "type": "s",
-      "value": "'#18181b'"
+      "value": "'rgb(154,153,150)'"
     },
     "dock-mode-initialized": {
       "type": "b",
