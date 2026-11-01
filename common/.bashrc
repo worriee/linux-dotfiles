@@ -372,9 +372,9 @@ alias orgz='organize.sh'
 # read organize.sh log
 alias orgz-log='cat /home/julry/.local/state/organize.log'
 # read dots.sh log
-alias dots-log='cat /home/julry/.local/state/dots.log'
+alias dots-log='cat /home/julry/.local/state/dots.log | tail -10'
 # read sessions.sh log
-alias sessions-log='cat /home/julry/.local/state/sessions.log'
+alias sessions-log='cat /home/julry/.local/state/sessions.log | tail -10'
 # main backups: dots.sh + sessions.sh
 alias bak='dots.sh && sessions.sh'
 # open crontab with zed
