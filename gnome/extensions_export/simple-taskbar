@@ -988,7 +988,7 @@
     },
     "dock-dodge-windows-enabled": {
       "type": "b",
-      "value": "false"
+      "value": "true"
     },
     "dock-max-length": {
       "type": "i",
@@ -1120,7 +1120,7 @@
     },
     "dock-autohide-enabled": {
       "type": "b",
-      "value": "true"
+      "value": "false"
     },
     "dock-position": {
       "type": "s",
