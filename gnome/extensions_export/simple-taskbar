@@ -900,7 +900,7 @@
     },
     "icon-size": {
       "type": "i",
-      "value": "50"
+      "value": "60"
     },
     "animate-appicon-hover-animation-rotation": {
       "type": "a{si}",
