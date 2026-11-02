@@ -277,7 +277,7 @@ repo() {
   fi
 }
 
-# update opensuse + flatpak pkgs in one pass
+# update opensuse + flatpaks + purge old kernels & snapshots in one pass
 sysup() {
   echo "--- Refresh Repositories ---"
   sudo zypper ref
@@ -287,6 +287,12 @@ sysup() {
   flatpak uninstall --unused
   echo "--- Updating openSUSE Tumbleweed ---"
   sudo zypper dup
+  echo "--- Purging Obsolete Kernels & Snapshots ---"
+  sudo zypper purge-kernels
+  sudo snapper cleanup number
+  echo "--- Refreshing Bootloader ---"
+  sudo update-bootloader --refresh
+  echo "=== System Update & Maintenance Complete! ==="
 }
 
 # --- DITO Hotspot Bypass Helpers ---
@@ -353,6 +359,52 @@ verify-bypass-dito() {
     echo "=========================================="
 }
 
+# ── Kernel & Snapper Auto-Setup Helpers ──
+
+# create 50-multiversion.conf to enforce 2-kernel rolling rotation
+kcfg() {
+  local target_file="/etc/zypp/zypp.conf.d/50-multiversion.conf"
+  if [ -f "$target_file" ] && grep -q "latest,latest-1,running" "$target_file" 2>/dev/null; then
+    echo "Notice: Kernel multiversion rule is ALREADY configured in $target_file."
+    return 0
+  fi
+
+  echo "Writing $target_file..."
+  sudo mkdir -p /etc/zypp/zypp.conf.d
+  sudo tee "$target_file" >/dev/null << 'EOF'
+[main]
+multiversion.kernels = latest,latest-1,running
+EOF
+  echo "Done! Kernel rule set to 'latest,latest-1,running'."
+}
+
+# update /etc/snapper/configs/root to keep 2-5 snapshot pairs
+snapcfg() {
+  local target_file="/etc/snapper/configs/root"
+  if grep -q '^NUMBER_LIMIT="2-5"' "$target_file" 2>/dev/null && grep -q '^NUMBER_LIMIT_IMPORTANT="2-5"' "$target_file" 2>/dev/null; then
+    echo "Notice: Snapper limits (2-5) are ALREADY configured in $target_file."
+    return 0
+  fi
+
+  echo "Setting Snapper limits to 2-5 in $target_file..."
+  sudo sed -i 's/^NUMBER_LIMIT=.*/NUMBER_LIMIT="2-5"/' "$target_file"
+  sudo sed -i 's/^NUMBER_LIMIT_IMPORTANT=.*/NUMBER_LIMIT_IMPORTANT="2-5"/' "$target_file"
+  echo "Running cleanup and refreshing bootloader..."
+  sudo snapper cleanup number
+  sudo update-bootloader --refresh
+  echo "Done! Snapper limit set to 2-5 pairs and boot menu refreshed."
+}
+
+# check active kernels, boot space, and snapper snapshots
+ksnap() {
+  echo "=== Active Kernels ==="
+  rpm -q kernel-default
+  echo -e "\n=== EFI Boot Partition (/boot/efi) ==="
+  df -h /boot/efi
+  echo -e "\n=== Active Snapper Snapshots ==="
+  sudo snapper list
+}
+
 # Some alias in this section
 
 # restart + flush ram & zram
@@ -383,3 +435,4 @@ alias cron='EDITOR="zed --wait" crontab -e'
 alias phone='nautilus "$(ls -d /run/user/1000/gvfs/sftp:*/storage/emulated/0 2>/dev/null | head -1)"'
 # cd into phone storage
 alias phonecd='cd "$(ls -d /run/user/1000/gvfs/sftp:*/storage/emulated/0 2>/dev/null | head -1)"'
+
