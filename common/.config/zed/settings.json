@@ -28,6 +28,7 @@
   "buffer_font_family": "JetBrains Mono",
   "proxy": "",
   "disable_ai": true,
+  "confirm_quit": true,
 
   "buffer_font_features": {
     "calt": false
