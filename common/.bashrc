@@ -282,7 +282,7 @@ sysup() {
   echo "--- Refresh Repositories ---"
   sudo zypper ref
   echo "--- Updating Flatpaks ---"
-  flatpak update
+  flatpak update || (flatpak repair && flatpak update)
   echo "--- Cleanup Flatpak ---"
   flatpak uninstall --unused
   echo "--- Updating openSUSE Tumbleweed ---"
@@ -437,4 +437,3 @@ alias cron='EDITOR="zed --wait" crontab -e'
 alias phone='nautilus "$(ls -d /run/user/1000/gvfs/sftp:*/storage/emulated/0 2>/dev/null | head -1)"'
 # cd into phone storage
 alias phonecd='cd "$(ls -d /run/user/1000/gvfs/sftp:*/storage/emulated/0 2>/dev/null | head -1)"'
-
