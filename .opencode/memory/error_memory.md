@@ -2,7 +2,7 @@
 
 ## 0. Last Synchronized Checkpoint
 
-- **Last Error Check**: October 25, 2026, 02:38 PM PST
+- **Last Error Check**: November 05, 2026, 08:48 AM PST
 
 ## 1. Active & Unresolved Errors
 
@@ -50,6 +50,15 @@ _List errors currently blocking development. Update this section immediately whe
 ## 2. Historical & Resolved Errors
 
 _Move errors to this section once they are completely verified as fixed. This serves as historical memory to prevent the AI from re-introducing the same bugs._
+
+### [RESOLVED] Super+Q close bridge — extension approach built, then deleted by owner decision; final shape = GNOME Close Window binding + confirm_quit (ERR-009, ERR-010, ERR-011, ERR-012, ERR-013)
+
+- **The chain (five related findings, November 05, 2026, 08:34 AM PST)**: (ERR-009) `org.gnome.Shell.Eval` returns `(false, '')` on GNOME 51.1 (unsafe-mode gate since GNOME 41) — both detection and the Eval-based close calls in the original custom_close.sh were dead; the `*"false"*` substring check masked it into a dead branch. (ERR-010) xdotool is X11/XTEST-only — cannot see or reach Wayland-native windows, incl. Zed (WAYLAND_DISPLAY in its /proc env). (ERR-011) the script's ydotool fallback chord `29:1 16:1…` was Ctrl+Q, not Alt (29=LeftCtrl, 56=LeftAlt), and ydotoold had never been set up. (ERR-012) Zed's Terminal context binds alt-q to SendText `/quit`, so a close from the terminal pane could never open the dialog. (ERR-013) an initial probe mis-read all 6 custom keybind slots as empty (gsettings called without the `custom-keybinding:<path>` schema — probe defect, corrected); truth: the `Custom Close Window` slot existed pointing at the script and GNOME wm `close` was `[]` (Alt+F4 dead system-wide).
+- **Built and removed**: a ~45-line user extension `custom-close@worriee` (D-Bus `GetFocusedWmClass` + native `CloseFocused`) + rewritten script + + 1 live keymap line + user ydotoold service were deployed and verified structurally; owner rejected the extension as overkill for the goal ("Super+Q closes windows like GNOME, Zed exception only"), so the extension and the rewritten script were deleted (November 05, 2026, 08:48 AM PST); the original script remains at `custom_close.sh.bak-dcheck`.
+- **Final accepted shape**: GNOME Settings → Windows → Close window = <Super>q, set personally by the owner (also the Custom Close Window slot binding must be cleared by the owner to avoid a double grab). Zed protection rides on `confirm_quit: true` on the WM close-request path — flaky per upstream Linux reports, risk accepted by the owner after explanation. Retained safety line in live `~/.config/zed/keymap.json` (kept from the don't-rebuild-it run): `"alt-f4": "zed::Quit"` → with close bound to <Super>q, a physical Alt+F4 is forwarded ungrabbed to Zed and shows the same dialog as a manual escape hatch.
+- **Prevention strategy**: on Wayland GNOME, window focus/close state is compositor-only; anything outside the shell has exactly two levers — keysling via ydotool (uinput, blind) or a shell extension (only sanctioned detection surface). Do not re-derive Eval/xdotool paths: both are proven dead on GNOME ≥ 41 + native-Wayland targets. And run schema-qualified gsettings reads (`schema:path key`) — bare-path reads silently print nothing and mimic "unconfigured".
+
+---
 
 ### [RESOLVED] sessions.sh exported frozen legacy-table content with bumped Updated headers + clone-churn eviction (ERR-007)
 
