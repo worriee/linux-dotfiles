@@ -421,6 +421,8 @@ alias sepkg='zypper se -i | grep '^i+''
 alias sepkgfull='zypper se -i'
 # fzf-pick ani-cli episode, play in mpv
 alias ani='mpv "$(find ~/Videos/ani-cli -type f \( -name "*.mp4" -o -name "*.mkv" \) | sort -V | fzf --layout=reverse)"'
+# check watched anime history (ani-cli)
+alias ani-log='ani-cli -l | tail -10'
 # sort files via organize.sh
 alias orgz='organize.sh'
 # read organize.sh log
