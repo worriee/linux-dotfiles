@@ -290,8 +290,6 @@ sysup() {
   echo "--- Purging Obsolete Kernels & Snapshots ---"
   sudo zypper purge-kernels
   sudo snapper cleanup number
-  echo "--- Refreshing Bootloader ---"
-  sudo update-bootloader --refresh
   echo "=== System Update & Maintenance Complete! ==="
 }
 
