@@ -428,7 +428,7 @@ cat /proc/swaps   # expect: only /dev/nvme0n1p6, 8G, priority -1
 
 ```bash
 sudo cp /etc/kernel/cmdline /etc/kernel/cmdline.bak-zswap
-sudo sed -i 's/$/ zswap.enabled=1 zswap.compressor=zstd zswap.zpool=zsmalloc zswap.max_pool_percent=25/' /etc/kernel/cmdline
+sudo sed -i 's/$/ zswap.enabled=1 zswap.compressor=zstd zswap.zpool=zsmalloc zswap.max_pool_percent=30/' /etc/kernel/cmdline
 sudo update-bootloader   # regenerates sd-boot entries from that file
 reboot
 ```
