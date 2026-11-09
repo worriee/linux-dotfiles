@@ -104,7 +104,7 @@ _(Expected output: `125`, `10`, `5`, `0`, `150` — files land in `/etc/sysctl.d
 1. Write the custom process priority rules (openSUSE path) and restart:
 
 ```bash
-echo 'EARLYOOM_ARGS="-m 5 -s 5 -r 3600 --avoid \"(^|/)(zed|opencode|node|kitty|bash)$\" --prefer \"(^|/)(brave|brave-browser)$\""' | sudo tee /etc/sysconfig/earlyoom && sudo systemctl enable --now earlyoom && sudo systemctl restart earlyoom
+echo 'EARLYOOM_ARGS="-m 5 -s 5 -r 3600 --avoid \"(^|/)(zed|opencode|node|kitty|bash|pi|ollama)$\" --prefer \"(^|/)(brave|brave-browser)$\""' | sudo tee /etc/sysconfig/earlyoom && sudo systemctl enable --now earlyoom && sudo systemctl restart earlyoom
 ```
 
 2. Verify:
