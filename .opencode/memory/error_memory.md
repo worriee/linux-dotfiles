@@ -2,7 +2,7 @@
 
 ## 0. Last Synchronized Checkpoint
 
-- **Last Error Check**: November 05, 2026, 08:48 AM PST
+- **Last Error Check**: November 09, 2026, 08:02 PM PST
 
 ## 1. Active & Unresolved Errors
 
@@ -50,6 +50,38 @@ _List errors currently blocking development. Update this section immediately whe
 ## 2. Historical & Resolved Errors
 
 _Move errors to this section once they are completely verified as fixed. This serves as historical memory to prevent the AI from re-introducing the same bugs._
+
+### [RESOLVED] Hibernation permanently blocked on this hardware — Acer S4 firmware refusal + amdgpu gfx suspend wedge; everything reverted (ERR-017)
+
+- **The chain (November 09, 2026, five hibernate attempts total)**: Attempts #2/#3 ran in platform mode and hit the same wall twice — `ACPI: PM: Preparing to enter system sleep state S4` → `Saving platform NVS memory` → `Restoring platform NVS memory` → `Waking up from system sleep state S4` in the same second. The Acer firmware advertises S4 (`ACPI: PM: (supports S0 S4 S5)`) but refuses the entry, so the machine instantly woke with `amdgpu` + `mt7921e` restore failing `-110` — screen black, system alive, recovery = hold power 5–10 s. Attempt #4 and #5 ran with `cat /sys/power/disk` verified showing `[shutdown]` (the one knob that skips the firmware entirely), but #4 never wrote anything — the "LED off" turn-off = the owner's own power-hold, not the kernel's clean power-down; proof = `dd if=/dev/nvme0n1p6 bs=1 count=10 | xxd` on the swap start was all zeros, no `S1SUSPEND` signature → no image ever written. Attempt #5 (fresh initrd, dracut resume conf from the exact-line openSUSE-doc ladder) wedged EARLIER in plain amdgpu suspend: `amdgpu_job_timedout → MODE2 reset → ring kiq test failed (-110) → KCQ enable failed → resume of IP block <gfx_v10_0> failed -110 → device wedged` — and the kernel names the process: `Process brave pid 9325 thread brave:cs0`, a browser gfx job that never finished inside the suspend window and whose self-reset could not recover the ring.
+- **The final state (owner decision, end of session, last attempt)**: complete revert — `/etc/kernel/cmdline` restored from `.bak-hibernate` (zswap trio kept; `resume=` and `lockdown=none` gone), `/etc/dracut.conf.d/99-fix-resume.conf` deleted, replaced the boot entry with `remove-kernel` + `depmod -a` + `add-kernel`, post-reboot verified clean `/proc/cmdline` (zswap trio only, no resume/lockdown, swap p6 works, zswap enabled/zstd/30). Receipts deleted (`/etc/fstab.bak-swap8g`, `/etc/kernel/cmdline.bak-hibernate-attempts`); `/etc/kernel/cmdline.bak-hibernate` kept as the safe restored-from copy. Residue that stays: dracut auto-bakes `resume=<largest-active-swap-uuid>` inside the fresh ESP initrd when no kernel param exists — a single inert line (current swap uuid, early boot reads it only if the kernel command line carries no `resume=`; every reboot with no image just prints `PM: Image not found (code -22)` and continues — proven by this morning's hard post-revert boot).
+- **Status**: RESOLVED as "blocked by vendor bugs, this machine cannot hibernate today". The openSUSE docs (`doc.opensuse.org/documentation/tumbleweed/power`) ladder was climbed completely — Secure Boot off (owner, BIOS) for `lockdown=none`, dedicated 8G partition swap lane ≥ RAM, swap in `/etc/fstab`, `resume=UUID` in bootloader cmdline — verified; what's left = two upstream bugs: (1) Acer firmware refusing ACPI S4 (skippable via `disk=shutdown`), (2) amdgpu gfx_v10_0 suspend/resume on Mendocino (Radeon 610M) wedging on suspend. Re-opening later = start from file the boot of each attempt, `journalctl -b <that-boot> -k`, and capture the amdgpu devcoredump (`/sys/class/drm/card1/device/devcoredump/data`) IMMEDIATELY after the wedge — the dump dies with the machine (attempt #5's dump lost the moment the owner power-held). Every failed wake leaves amdgpu wedged → expect black-screen-alive → hold power 5–10 s.
+
+---
+
+### [RESOLVED] sdbootutil never regenerated ESP initrd — `dracut[F]: modules.dep is missing` + skip-if-exists + user-shell glob blind spot (ERR-016)
+
+- **The Issue**: the ESP `initrd-<hash>` files are not copies — sdbootutil generates its own initrd per boot entry via dracut. `update-bootloader --add-kernel` then failed hard: `dracut[F]: /usr/lib/modules/7.3.1-1-default/modules.dep is missing. Did you run depmod?` → `ERROR: Failed to generate the initrd for 7.3.1-1-default`. Depmod outputs (`modules.dep`, aliases) missing from `.../7.3.1-1-default/` — `sudo rpm -V kernel-default` is completely clean since openSUSE kernel RPMs do not own those files. A `remove→add` pair even DELETED existing `modules.dep` from a working tree (dir mtime confirmed), the removed hash initrd files left the owner with a fully bootless box until manual rebuild.
+- **The Resolution**: `sudo depmod -a 7.3.1-1-default` (standard, safe) restored the index, then `--add-kernel` succeeded and generated the fresh initrd with the CURRENT `options` line. Verification law: `bootctl list` must show the entry NOT as `(reported/absent)` — the `reported` EFI-var leftovers can lie for entries whose files are gone; and `lsinitrd` checks the file content directly, not just existence.
+- **Prevention Strategy**: on Tumbleweed systemd-boot installs, "menu shows an entry" ≠ "the initrd for it is current" — three separate things: config = menu text, install = shim, add-kernel = initrd generation. When a skip or stale initrd content is suspected and the plain-path shell fails weirdly: the owner's own shell cannot read `/boot/efi` (root-only), so `sudo rm /boot/efi/.../initrd-*` expands the `*` glob WITHOUT permissions and finds nothing — the fix is `sudo bash -c 'rm /boot/efi/.../initrd-*'`, and `sudo rpm -V` being silent means the file was rpm-visible, not that everything is fine (never shipped depmod outputs).
+
+---
+
+### [RESOLVED] Dead swap UUID baked into 3 ESP initrd copies; `--refresh`/`--reinit` only rewrote text (ERR-015)
+
+- **The Issue**: `lsinitrd` on every ESP hash-named initrd greps dead swap uuid `636ef42f-…` (the pre-refor-mat swap lane) 1× everywhere, while `/boot/initrd-7.3.1-1-default` was clean: the plain `sudo dracut -f` rebuilt only the /boot copy, but the boot menu actually loads the ESP hash-named copy the sd-boot entry points at — every boot ate stale baked-in `resume=` tokens. Kernel `/proc/cmdline` (carrying the NEW uuid) wins by law of precedence but leaves lower confidence, forcing every probe to double-grep (old uuid AND new uuid, separate counts).
+- **The Resolution**: `/var/log/pbl.log` (sudo cat required) shows every run of `update-bootloader` on the day only executed `install` (shim reinstall) and `update-all-entries` (menu text) — never an initrd copy/generation; two more `--reinit` calls also did nothing new for the initrd files. Full repair = remove-kernel → `depmod -a` → add-kernel; verification = `for f in /boot/efi/opensuse-tumbleweed/7.3.1-1-default/initrd-*; lsinitrd "$f" | grep -c 636ef42f` = `0` everywhere and `bootctl list` shows fresh entry.
+- **Prevention Strategy**: never assume "refresh the bootloader" refreshes initrd assets; treat each update-bootloader option as doing exactly what its flag says. When the boot is sourced from ESP-hash initrds, correctness of the baked cmdline lives in the initrd, not in `/etc/kernel/cmdline`; grep, don't trust. Bad grep patterns hide lines (`PM: Swap header`, `PM: Cannot find swap device` never matched by a pattern that lacks `Swap|Cann`) — for life-critical honesty, dump the full boot kernel log to a file (`sudo journalctl -b -1 -k --no-pager > /tmp/opencode/…`) and grep there.
+
+---
+
+### [RESOLVED] First hibernate attempt aborted — kernel `Error -12` (ENOMEM) at image prealloc (ERR-014)
+
+- **The Issue** (November 09, 2026, afternoon, first attempt, before the 16:45 window): `sudo systemctl hibernate` aborted `PM: Error -12` at preallocate — `PM: hibernation: Normal pages needed: 1018321 + 1024, available pages: 878886` = needed ~3.9 GiB for snapshot vs ~3.4 GiB free, ~600 MB short. Abort = `evictable` progress lost: the attempt resumed as a half-wake with `amdgpu` userland already partially suspended → screen black, system alive, recovery = hold power 5–10 s.
+- **The kernel logic figured out (kernel/power source read during session)**: the check failing = `enough_free_mem` pre-snapshot gate; needs_free → copy-batch; image default cap = 2/5 of RAM; `image_size=0` = most aggressive prealloc. Fix-shape for any machine that hibernate-cans: close apps, `sync && echo 3 | sudo tee /proc/sys/vm/drop_caches`, re-echo both knobs (`echo 0 | sudo tee /sys/power/image_size`, `echo shutdown | sudo tee /sys/power/disk`) — both knobs RESET at every boot, not per attempt.
+- **Status**: root-caused and superseded — attempts #2–#5 all passed this check (`Normal pages needed: 521685 + 1024, available 1375634` …). -12 was never the real wall; that ceiling is permanently recorded inside ERR-017.
+
+---
 
 ### [RESOLVED] Super+Q close bridge — extension approach built, then deleted by owner decision; final shape = GNOME Close Window binding + confirm_quit (ERR-009, ERR-010, ERR-011, ERR-012, ERR-013)
 
