@@ -52,7 +52,7 @@
     },
     "folder-menu-uri": {
       "type": "s",
-      "value": "''"
+      "value": "'file:///home/julry'"
     },
     "unfocused-indicator-color": {
       "type": "s",
@@ -104,7 +104,7 @@
     },
     "taskbar-side-padding": {
       "type": "i",
-      "value": "5"
+      "value": "4"
     },
     "panel-position": {
       "type": "s",
@@ -504,7 +504,7 @@
     },
     "taskbar-floating-gap": {
       "type": "i",
-      "value": "4"
+      "value": "8"
     },
     "taskbar-mode-settings": {
       "type": "a{sv}",
@@ -540,7 +540,7 @@
     },
     "taskbar-corner-radius": {
       "type": "i",
-      "value": "24"
+      "value": "20"
     },
     "group-apps-label-font-weight": {
       "type": "s",
@@ -768,7 +768,7 @@
     },
     "taskbar-floating-snap-to-edge": {
       "type": "b",
-      "value": "true"
+      "value": "false"
     },
     "leave-timeout": {
       "type": "i",
@@ -908,11 +908,11 @@
     },
     "panel-height": {
       "type": "i",
-      "value": "32"
+      "value": "30"
     },
     "icon-size": {
       "type": "i",
-      "value": "60"
+      "value": "50"
     },
     "animate-appicon-hover-animation-rotation": {
       "type": "a{si}",
@@ -976,7 +976,7 @@
     },
     "taskbar-floating": {
       "type": "b",
-      "value": "false"
+      "value": "true"
     },
     "group-apps-use-fixed-width": {
       "type": "b",
@@ -988,7 +988,7 @@
     },
     "dock-floating-snap-to-edge": {
       "type": "b",
-      "value": "true"
+      "value": "false"
     },
     "dock-dodge-windows-mode": {
       "type": "s",
@@ -1000,7 +1000,7 @@
     },
     "dock-dodge-windows-enabled": {
       "type": "b",
-      "value": "true"
+      "value": "false"
     },
     "dock-max-length": {
       "type": "i",
@@ -1056,7 +1056,7 @@
     },
     "dock-vertical-settings": {
       "type": "a{sv}",
-      "value": "{'dock-axis-profile-version': <uint32 1>, 'application-hover-action': <'do-nothing'>, 'show-progress-bars': <false>, 'start-button-padding': <2>, 'animate-appicon-hover-animation-zoom': <{'simple': 1.0, 'ripple': 1.25, 'magnify': 1.51}>, 'locations-show-home': <false>, 'running-indicator-position': <'left'>, 'animate-appicon-hover-animation-type': <'magnify'>, 'taskbar-highlight-style': <'glass'>, 'application-overflow-style': <'taskbar'>, 'icon-edge-padding': <3>, 'combine-app-buttons-mode': <'always'>, 'locations-show-downloads': <false>, 'taskbar-highlight-length': <58>, 'use-pinned-apps-as-launchers': <false>, 'icon-spacing': <0>, 'show-start-button-separator': <false>, 'app-alignment': <'left'>, 'gnome-start-button-visible': <false>, 'classic-highlight-appicon-hover': <false>, 'isolate-workspaces': <false>, 'icon-size': <45>, 'show-pinned-app-separator': <true>, 'windows-start-menu-enabled': <false>, 'dock-min-icon-size': <32>, 'dock-dodge-windows-mode': <'all-windows'>, 'dock-dodge-windows-enabled': <false>, 'dock-max-length': <90>, 'dock-hide-dash-enabled': <true>, 'dock-transparency-dynamic-level': <70>, 'dock-floating': <false>, 'dock-panel-height': <147>, 'dock-custom-panel-color-enabled': <true>, 'dock-item-order': <['start-button', 'applications']>, 'dock-panel-mode-floating': <false>, 'dock-panel-mode': <true>, 'dock-panel-theme': <'dark'>, 'dock-transparency-level': <80>, 'dock-panel-theme-follow-system': <false>, 'dock-transparency-enabled': <true>, 'dock-panel-border-light-enabled': <false>, 'dock-panel-border-enabled': <false>, 'dock-custom-panel-color': <'rgb(154,153,150)'>, 'dock-autohide-enabled': <false>, 'dock-show-locations': <true>, 'dock-panel-height-follow-icon-size': <true>, 'dock-workspace-scroll-action': <'switch-workspace'>, 'dock-highlight-edge-gap': <0>, 'dock-show-mounts': <false>, 'dock-transparency-on-unmaximized': <false>}"
+      "value": "{'dock-axis-profile-version': <uint32 1>, 'application-hover-action': <'do-nothing'>, 'show-progress-bars': <false>, 'start-button-padding': <2>, 'animate-appicon-hover-animation-zoom': <{'simple': 1.0, 'ripple': 1.25, 'magnify': 1.51}>, 'locations-show-home': <false>, 'running-indicator-position': <'left'>, 'animate-appicon-hover-animation-type': <'magnify'>, 'taskbar-highlight-style': <'glass'>, 'application-overflow-style': <'taskbar'>, 'icon-edge-padding': <3>, 'combine-app-buttons-mode': <'always'>, 'locations-show-downloads': <false>, 'taskbar-highlight-length': <58>, 'use-pinned-apps-as-launchers': <false>, 'icon-spacing': <0>, 'show-start-button-separator': <false>, 'app-alignment': <'left'>, 'gnome-start-button-visible': <false>, 'classic-highlight-appicon-hover': <false>, 'isolate-workspaces': <false>, 'icon-size': <45>, 'show-pinned-app-separator': <true>, 'windows-start-menu-enabled': <false>, 'dock-min-icon-size': <32>, 'dock-dodge-windows-mode': <'all-windows'>, 'dock-dodge-windows-enabled': <false>, 'dock-max-length': <90>, 'dock-hide-dash-enabled': <true>, 'dock-transparency-dynamic-level': <70>, 'dock-floating': <false>, 'dock-panel-height': <74>, 'dock-custom-panel-color-enabled': <true>, 'dock-item-order': <['start-button', 'applications']>, 'dock-panel-mode-floating': <false>, 'dock-panel-mode': <true>, 'dock-panel-theme': <'dark'>, 'dock-transparency-level': <80>, 'dock-panel-theme-follow-system': <false>, 'dock-transparency-enabled': <true>, 'dock-panel-height-follow-icon-size': <true>, 'dock-panel-border-light-enabled': <false>, 'dock-panel-border-enabled': <false>, 'dock-custom-panel-color': <'rgb(154,153,150)'>, 'dock-full-width-side-padding': <0>, 'dock-show-locations': <true>, 'dock-autohide-enabled': <false>, 'dock-workspace-scroll-action': <'switch-workspace'>, 'dock-highlight-edge-gap': <0>, 'dock-show-mounts': <false>, 'dock-transparency-on-unmaximized': <false>}"
     },
     "dock-autohide-hide-delay": {
       "type": "i",
@@ -1096,7 +1096,7 @@
     },
     "dock-horizontal-settings": {
       "type": "a{sv}",
-      "value": "{'dock-axis-profile-version': <uint32 1>, 'application-hover-action': <'do-nothing'>, 'show-progress-bars': <false>, 'start-button-padding': <2>, 'animate-appicon-hover-animation-zoom': <{'simple': 1.0, 'ripple': 1.25, 'magnify': 1.51}>, 'locations-show-home': <false>, 'animate-appicon-hover-animation-type': <'magnify'>, 'taskbar-highlight-style': <'glass'>, 'application-overflow-style': <'taskbar'>, 'icon-edge-padding': <3>, 'combine-app-buttons-mode': <'always'>, 'locations-show-downloads': <false>, 'taskbar-highlight-length': <58>, 'use-pinned-apps-as-launchers': <false>, 'icon-spacing': <0>, 'show-start-button-separator': <false>, 'gnome-start-button-visible': <false>, 'classic-highlight-appicon-hover': <false>, 'isolate-workspaces': <false>, 'icon-size': <50>, 'show-pinned-app-separator': <true>, 'windows-start-menu-enabled': <false>, 'dock-min-icon-size': <32>, 'dock-dodge-windows-mode': <'all-windows'>, 'dock-dodge-windows-enabled': <false>, 'dock-hide-dash-enabled': <true>, 'dock-transparency-dynamic-level': <70>, 'dock-floating': <false>, 'dock-panel-height': <147>, 'dock-custom-panel-color-enabled': <true>, 'dock-item-order': <['start-button', 'applications']>, 'dock-panel-mode': <false>, 'dock-panel-theme': <'dark'>, 'dock-transparency-level': <80>, 'dock-panel-theme-follow-system': <false>, 'dock-transparency-enabled': <true>, 'dock-panel-border-light-enabled': <true>, 'dock-panel-border-enabled': <true>, 'dock-custom-panel-color': <'rgb(154,153,150)'>, 'dock-autohide-enabled': <false>, 'dock-show-locations': <true>, 'dock-workspace-scroll-action': <'switch-workspace'>, 'dock-floating-gap': <10>, 'dock-highlight-edge-gap': <0>, 'dock-show-mounts': <false>, 'dock-transparency-on-unmaximized': <false>}"
+      "value": "{'dock-axis-profile-version': <uint32 1>, 'application-hover-action': <'do-nothing'>, 'show-progress-bars': <false>, 'show-location-separator': <false>, 'start-button-padding': <2>, 'animate-appicon-hover-animation-zoom': <{'simple': 1.0, 'ripple': 1.25, 'magnify': 1.51}>, 'locations-show-home': <false>, 'animate-appicon-hover-animation-type': <'magnify'>, 'taskbar-highlight-style': <'glass'>, 'application-overflow-style': <'taskbar'>, 'icon-edge-padding': <3>, 'combine-app-buttons-mode': <'always'>, 'locations-show-downloads': <false>, 'taskbar-highlight-length': <58>, 'use-pinned-apps-as-launchers': <false>, 'icon-spacing': <0>, 'show-start-button-separator': <false>, 'gnome-start-button-visible': <false>, 'classic-highlight-appicon-hover': <false>, 'isolate-workspaces': <false>, 'icon-size': <60>, 'show-pinned-app-separator': <true>, 'windows-start-menu-enabled': <false>, 'dock-min-icon-size': <32>, 'dock-dodge-windows-mode': <'all-windows'>, 'dock-dodge-windows-enabled': <true>, 'dock-hide-dash-enabled': <true>, 'dock-transparency-dynamic-level': <70>, 'dock-floating': <false>, 'dock-panel-height': <147>, 'dock-custom-panel-color-enabled': <true>, 'dock-item-order': <['applications', 'start-button']>, 'dock-panel-mode': <false>, 'dock-panel-theme': <'dark'>, 'dock-transparency-level': <80>, 'dock-autohide-hide-delay': <200>, 'dock-panel-theme-follow-system': <false>, 'dock-transparency-enabled': <true>, 'dock-panel-border-light-enabled': <true>, 'dock-panel-border-enabled': <true>, 'dock-custom-panel-color': <'rgb(154,153,150)'>, 'dock-show-locations': <true>, 'dock-autohide-enabled': <false>, 'dock-workspace-scroll-action': <'do-nothing'>, 'dock-autohide-reveal-fullscreen': <false>, 'dock-side-padding': <0>, 'dock-floating-gap': <10>, 'dock-highlight-edge-gap': <0>, 'dock-show-mounts': <false>, 'dock-autohide-reveal-mode': <'instant'>, 'dock-transparency-on-unmaximized': <false>}"
     },
     "dock-edge-reveal-enabled": {
       "type": "b",
@@ -1188,7 +1188,7 @@
     },
     "dock-floating-gap": {
       "type": "i",
-      "value": "10"
+      "value": "8"
     },
     "dock-launch-to-desktop-enabled": {
       "type": "b",
@@ -1204,7 +1204,7 @@
     },
     "dock-corner-radius": {
       "type": "i",
-      "value": "22"
+      "value": "20"
     },
     "dock-axis-profiles-enabled": {
       "type": "b",
