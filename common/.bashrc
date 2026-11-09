@@ -407,8 +407,6 @@ ksnap() {
 
 # trash items instead of rm or rm -rf
 alias tr='gio trash'
-# restart + flush ram & zram
-alias rest='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager'
 # gaming mode: swappiness 10
 alias game='sudo /usr/sbin/sysctl -w vm.swappiness=10 >/dev/null && echo game: swappiness 10'
 # coding mode: swappiness 180

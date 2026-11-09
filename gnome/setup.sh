@@ -91,12 +91,12 @@ unset _f _PATH_FILES
 # package — that re-does the full refresh and re-prompts for a password N times.
 sudo zypper -n ref >/dev/null 2>&1 || true
 STEP "Checking package availability (zypper dry-check)"
-for _pkg in fastfetch kitty earlyoom zram-generator gcc make kernel-default-devel curl gnome-extensions; do
+for _pkg in fastfetch kitty earlyoom gcc make kernel-default-devel curl gnome-extensions; do
     if zypper se -x --match-exact "$_pkg" >/dev/null 2>&1; then OK "$_pkg found"
     else WARN "$_pkg not found in repos — install still attempted for the rest"; FAILED_STEPS+=("pkg missing: $_pkg"); fi
 done
 unset _pkg
-run_step "Installing packages" pkg_in fastfetch kitty earlyoom zram-generator gcc make kernel-default-devel curl gnome-extensions
+run_step "Installing packages" pkg_in fastfetch kitty earlyoom gcc make kernel-default-devel curl gnome-extensions
 
 # Starship prompt (not in repos — official installer, skipped if present)
 STEP "Starship prompt engine"
@@ -114,8 +114,8 @@ else
 fi
 unset _SH_TMP
 
-# Install repo .bashrc (custom aliases: rest) — idempotent
-STEP "Installing .bashrc (alias: rest)"
+# Install repo .bashrc (custom aliases: game, code) — idempotent
+STEP "Installing .bashrc (aliases: game, code)"
 if [ -f "$HOME_DIR/.bashrc" ] && cmp -s "$COMMON_DIR/.bashrc" "$HOME_DIR/.bashrc"; then
     OK ".bashrc aliases already present"
 elif [ -f "$COMMON_DIR/.bashrc" ]; then
@@ -132,22 +132,6 @@ if ! grep -q 'starship init bash' "$HOME_DIR/.bashrc" 2>/dev/null; then
 else
     OK "starship hook already in .bashrc"
 fi
-
-# Distro-specific `rest` alias — rewrite the alias line in place (idempotent)
-STEP "Setting distro-specific rest alias ($DISTRO)"
-_REST_LINE="alias rest='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager' # distro-fresh-alias"
-if [ -f "$HOME_DIR/.bashrc" ]; then
-    if grep -qF "$_REST_LINE" "$HOME_DIR/.bashrc" 2>/dev/null; then
-        OK "rest alias already correct for $DISTRO"
-    else
-        sed -i '/# distro-fresh-alias$/d' "$HOME_DIR/.bashrc"
-        echo "$_REST_LINE" >> "$HOME_DIR/.bashrc"
-        OK "rest alias set for $DISTRO"
-    fi
-else
-    WARN "$HOME_DIR/.bashrc missing — rest alias skipped"
-fi
-unset _REST_LINE
 
 # Swappiness profile aliases — game low, code max (idempotent)
 STEP "Swappiness aliases game/code"
@@ -280,36 +264,28 @@ fi
 # ------------------------------------------------
 # 5. System tweaks (sudo)
 # ------------------------------------------------
-run_step "Swappiness 180 + page-cluster 0 (zram)" bash -c 'printf "vm.swappiness=180\nvm.page-cluster=0\n" | sudo tee /etc/sysctl.d/99-swappiness.conf >/dev/null && sudo sysctl --system >/dev/null'
+run_step "Swappiness 180 + page-cluster 0 (zswap)" bash -c 'printf "vm.swappiness=180\nvm.page-cluster=0\n" | sudo tee /etc/sysctl.d/99-swappiness.conf >/dev/null && sudo sysctl --system >/dev/null'
 
 OK "bootloader untouched (by design)"
 OK "btrfs root — ext4 reserve N/A (snapper covers rollback)"
 
-# ZRAM: zstd + 100% RAM via zram-generator (see setup.md Section 11)
-STEP "ZRAM compressed swap (zstd, min(ram))"
-# Post-state is asserted via zramctl — never assumed.
-if grep -q "zram-size = min(ram)" /etc/systemd/zram-generator.conf 2>/dev/null \
-    && grep -q "compression-algorithm = zstd" /etc/systemd/zram-generator.conf 2>/dev/null \
-    && /usr/sbin/zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
-    OK "zram already configured (zstd, 100% RAM, active)"
+# ZSWAP: compressed write-back cache in front of the 8G NVMe swap partition
+# (see setup.md Section 11). Verify-only by policy: the swap partition, fstab and
+# /etc/kernel/cmdline are owner-managed — this script writes no boot state.
+STEP "ZSWAP verify (real swap device + compressed cache)"
+_SWAP_DEV="$(awk 'NR>1 && $1 !~ /zram/ {print $1; exit}' /proc/swaps 2>/dev/null)"
+_ZSWAP_EN="$(cat /sys/module/zswap/parameters/enabled 2>/dev/null)"
+_ZSWAP_CMP="$(cat /sys/module/zswap/parameters/compressor 2>/dev/null)"
+if [ -n "$_SWAP_DEV" ] && [ "$_ZSWAP_EN" = "Y" ] && [ "$_ZSWAP_CMP" = "zstd" ]; then
+    OK "zswap verified: swap on $_SWAP_DEV, enabled=Y, compressor=zstd"
 else
-    # Park the legacy script-based service if present (avoids double zram devices)
-    sudo systemctl disable --now zramswap >/dev/null 2>&1 || true
-    if printf '[zram0]\nzram-size = min(ram)\ncompression-algorithm = zstd\n' | sudo tee /etc/systemd/zram-generator.conf >/dev/null \
-        && sudo systemctl daemon-reload >/dev/null 2>&1 \
-        && sudo systemctl enable --now systemd-zram-setup@zram0.service >/dev/null 2>&1; then
-        # No `systemctl restart dev-zram0.swap`: restarting the unit does not recreate
-        # /dev/zram0 with the new settings. A reboot is what activates them; the `rest`
-        # alias is the user's manual way to do that.
-        if /usr/sbin/zramctl --noheadings --output ALGORITHM 2>/dev/null | grep -qi zstd; then
-            OK "zram configured + active (zstd, 100% RAM, verified via zramctl)"
-        else
-            WARN "zram config written but not yet active — REBOOT required, then run: zramctl"; FAILED_STEPS+=("zram verify (reboot pending)")
-        fi
-    else
-        WARN "zram config failed — see setup.md Section 11"; FAILED_STEPS+=("zram config")
-    fi
+    WARN "zswap not fully active — run setup.md Section 11 by hand (boot state stays owner-managed):"
+    WARN "  Step 1  8G swap partition + fstab UUID   Step 2  drop zram if a /dev/zram0 shows"
+    WARN "  Step 3  append zswap tokens to /etc/kernel/cmdline + update-bootloader"
+    WARN "  Step 4  reboot, then re-check: swap on $_SWAP_DEV, enabled post-reboot"
+    FAILED_STEPS+=("zswap verify")
 fi
+unset _SWAP_DEV _ZSWAP_EN _ZSWAP_CMP
 
 # Kernel VM tuning: cache pressure, writeback, watermark (see setup.md Section 1D)
 STEP "Kernel VM tuning (vfs cache, dirty ratios, watermark)"
@@ -449,11 +425,11 @@ echo
 echo "==============================================="
 echo " DONE — summary"
 echo "==============================================="
-echo " applied : dotfiles (kitty, starship, fastfetch, opencode), .bashrc rest alias,"
+echo " applied : dotfiles (kitty, starship, fastfetch, opencode), .bashrc aliases (game, code),"
 echo "           GNOME extensions (3 IDs), dconf dumps + keybinds, blur-my-shell panel+apps,"
 echo "           animations off, download-updates off, localsearch+evolution masked,"
 echo "           cups/avahi disabled (BT kept), swappiness, VM tuning, earlyoom,"
-echo "           zram swap (zstd, zram-generator), ModemManager disabled"
+echo "           zswap verify (8G NVMe swap), ModemManager disabled"
 echo "           bootloader untouched (by design); snapper pre-dotfiles snapshot attempted"
 if [ "${#FAILED_STEPS[@]}" -gt 0 ]; then
     echo " FAILED  : ${FAILED_STEPS[*]}  (re-run script or do manually via setup.md)"

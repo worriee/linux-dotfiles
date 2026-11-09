@@ -9,7 +9,7 @@ Run in this order after a fresh install.
 ## 0. Support scope (read first)
 
 - GNOME-only: this repo automates GNOME customizations. Other desktops are not supported; `setup.sh` aborts off-GNOME.
-- openSUSE Tumbleweed GNOME (zypper): full flow — `zram-generator` (`/etc/systemd/zram-generator.conf`), `/etc/sysconfig/earlyoom`, GDM via `display-manager`, bootloader untouched, btrfs root with snapper `pre-dotfiles` snapshot.
+- openSUSE Tumbleweed GNOME (zypper): full flow — ZSWAP + 8G NVMe swap partition `nvme0n1p6` (boot params in `/etc/kernel/cmdline`, Section 11), `/etc/sysconfig/earlyoom`, GDM via `display-manager`, bootloader untouched except append-only cmdline tokens (Section 11), btrfs root with snapper `pre-dotfiles` snapshot.
 - No Mint/Ubuntu path in this repo. For XFCE/Mint see `xfce/`.
 - Fonts are not vendored here (they live in `common/.local/share/fonts/` and `setup.sh` copies them). No `~/.local/share/gnome-shell/extensions/*` dirs vendored, no `/home/julry/.config/dconf/user` binary — text `dconf/` dumps only.
 
@@ -19,17 +19,17 @@ Run in this order after a fresh install.
 
 Everything the kernel, filesystem and background services need to run fast and lean on this machine — swap strategy, disk space, memory-reclaim behavior, OOM protection and dev-tooling tuning.
 
-### 1A. Swappiness + Swap Readahead (60 → 200 with ZRAM)
+### 1A. Swappiness + Swap Readahead (60 → 180 with ZSWAP)
 
 #### What This Does
 
 Swappiness controls how aggressively Linux moves idle RAM pages into swap instead of keeping them in physical memory.
 
 - **Default (60):** moderate balance, tuned for slow disk swap.
-- **With ZRAM (200):** max aggressive — kernel swaps idle pages eagerly into fast compressed RAM (see Section 11), freeing real RAM for Brave many tabs + Zed/opencode. SSD swapfile touched only after zram fills — SSD wear _down_, not up. `game` alias drops to 10 for gaming.
-- **page-cluster (0):** controls swap readahead (pages fetched per I/O = 2^n). With zram, swap I/O is random compressed-RAM access — multi-page readahead just amplifies CPU work decompressing unused pages. `0` = one page per I/O, precise, no overfetch. Default on this kernel is already 0; setting it explicitly keeps the pairing documented.
+- **With ZSWAP (180):** aggressive — idle pages are caught by zswap first, squeezed ~2.5–3× into the compressed RAM pocket; only the coldest pages spill to the 8G NVMe swap partition, still compressed on disk (see Section 11). NVMe wear stays far below uncompressed paging. `game` alias drops to 10 for gaming.
+- **page-cluster (0):** controls swap readahead (pages fetched per I/O = 2^n). With zswap, most swap traffic never becomes I/O at all (caught by the compressed RAM pocket) — multi-page readahead would only waste fetches on NVMe. `0` = one page per I/O, precise, no overfetch. Default on this kernel is already 0; setting it explicitly keeps the pairing documented.
 
-> Requires Section 11 (ZRAM) to be set up first. Without zram, keep this low (10) to protect the SSD.
+> Requires Section 11 (ZSWAP + 8G swap partition) to be set up first. Without disk swap, keep this low (10) to protect the SSD.
 
 #### Step-by-Step
 
@@ -47,7 +47,7 @@ cat /proc/sys/vm/swappiness
 cat /proc/sys/vm/page-cluster
 ```
 
-_(Expected output: `200` then `0`)_
+_(Expected output: `180` then `0`)_
 
 Bootloader is untouched by design on openSUSE (no GRUB-timeout step). btrfs root skips any ext4 reserve step (snapper covers rollback).
 
@@ -134,7 +134,7 @@ Verify: `systemctl is-enabled ModemManager` → `disabled`.
 
 #### What This Does
 
-Caps the V8 JavaScript heap at **1536MB** so opencode sessions and npm builds degrade gracefully on the 8GB machine instead of starving zram and triggering the OOM guard. The limit applies to every `node` process started from your shell.
+Caps the V8 JavaScript heap at **1536MB** so opencode sessions and npm builds degrade gracefully on the 8GB machine instead of starving the swap lane and triggering the OOM guard. The limit applies to every `node` process started from your shell.
 
 #### Step-by-Step
 
@@ -373,16 +373,16 @@ GDM restart (logs you out — save work first):
 sudo systemctl restart display-manager
 ```
 
-Flush zram + restart session (combined):
+Flush swap + restart session (combined):
 
 ```bash
-sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager
+sudo systemctl restart dev-nvme0n1p6.swap && sudo systemctl restart display-manager
 ```
 
-Shortcut alias — one word: `fresh` (auto-installed by `setup.sh`):
+Shortcut alias — one word: `fresh` (optional, manual — paste into `~/.bashrc` if wanted; `setup.sh` dropped the install after the zswap migration):
 
 ```bash
-alias fresh='sudo systemctl restart dev-zram0.swap && sudo systemctl restart display-manager' # distro-fresh-alias
+alias fresh='sudo systemctl restart dev-nvme0n1p6.swap && sudo systemctl restart display-manager' # distro-fresh-alias
 ```
 
 Other refreshes:
@@ -400,61 +400,65 @@ Only override shipped here is the Evolution alarm kill (see Section 5). Location
 
 ---
 
-## 11. ZRAM Compressed Swap (zstd, zram-generator)
+## 11. ZSWAP + 8G NVMe Swap Partition (migrated from ZRAM — November 9, 2026)
 
-Compressed swap in RAM: a virtual block device (`/dev/zram0`) that holds swapped pages compressed in memory instead of writing them to the SSD. Works together with Section 1A (swappiness 180): Linux first compresses idle pages into fast RAM, and only touches the SSD swapfile after zram fills up.
+Compressed write-back cache **in front of** physical swap: zswap catches every page the kernel wants to swap, squeezes it with zstd (~2.5–3×) and holds it in a RAM pool capped by `max_pool_percent`. Only when the pool fills do the coldest, longest-untouched compressed pages spill to `/dev/nvme0n1p6` — an 8GB NVMe swap partition, still compressed on disk. History: the old ZRAM lane (`zram-generator`, `/etc/systemd/zram-generator.conf`) was deleted on November 9, 2026 — zram packed swapped pages back into RAM forever, so heavy LLM sessions never truly freed memory; zswap lets cold pages actually leave RAM.
 
-### Step 1: Install the Management Package
+### Step 1: the 8G swap partition (prerequisite, also the future hibernation prerequisite)
 
-```bash
-sudo zypper -n in zram-generator
-```
-
-### Step 2: Configure Algorithm and Allocation Size
-
-`/etc/systemd/zram-generator.conf`:
-
-```text
-[zram0]
-zram-size = min(ram)
-compression-algorithm = zstd
-```
-
-- `zram-size = min(ram)` — zram capacity = 100% of installed RAM. Dynamic limit: only consumes physical memory as data is actively compressed into it.
-- `compression-algorithm = zstd` — Zstandard: much tighter ratio (~30–35% of original size) with negligible CPU overhead on modern multi-core processors.
-
-### Step 3: Apply the Configuration
+Shape: a real partition grown in a gparted live session — shrink `p5` tail 6G, recreate `p6` at the **same end boundary**, `p7` untouched (`nvme0n1p6` went 2G→8G on November 9, 2026). fstab entry, insert-only:
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now systemd-zram-setup@zram0.service
-sudo systemctl restart dev-zram0.swap
+UUID=f83e8786-ff25-4551-b570-baad5d4d7dd5  swap  swap  defaults  0 0
+sudo swapon /dev/nvme0n1p6
 ```
 
-### Step 4: Verification and Priority Check
+**UUID trap:** reformatting the swap partition (the `mkswap` inside gparted's New/Format step) mints a NEW UUID — this machine's old `636ef42f-…` died exactly that way. After any reformat: `lsblk -no UUID /dev/nvme0n1p6`, fix fstab, then swapon. Miss it = silent no-swap at every boot.
+
+### Step 2: drop ZRAM
 
 ```bash
-zramctl
-swapon --show
+cat /proc/swaps   # check zram0 Used ≈ 0 first — swapoff mid-load = swap-in thrash lag
+sudo swapoff /dev/zram0
+sudo rm /etc/systemd/zram-generator.conf
+cat /proc/swaps   # expect: only /dev/nvme0n1p6, 8G, priority -1
 ```
 
-Expected `zramctl` output:
+### Step 3: boot params (systemd-boot → `/etc/kernel/cmdline`)
 
-| Field        | Expected Value                            |
-| ------------ | ----------------------------------------- |
-| `NAME`       | `/dev/zram0`                              |
-| `ALGORITHM`  | `zstd`                                    |
-| `DISKSIZE`   | 100% of RAM (e.g. `7G` on an 8GB machine) |
-| `MOUNTPOINT` | `[SWAP]`                                  |
+```bash
+sudo cp /etc/kernel/cmdline /etc/kernel/cmdline.bak-zswap
+sudo sed -i 's/$/ zswap.enabled=1 zswap.compressor=zstd zswap.zpool=zsmalloc zswap.max_pool_percent=25/' /etc/kernel/cmdline
+sudo update-bootloader   # regenerates sd-boot entries from that file
+reboot
+```
 
-Expected `swapon --show` priorities:
+Append-only: the original tokens (`root=…`, `selinux=1`, …) must all still be there after the edit. Cmdline is the only correct persistence lane — zswap is built-in, so modprobe.d does nothing.
 
-| Swap Source  | Priority | Role                                     |
-| ------------ | -------- | ---------------------------------------- |
-| `/dev/zram0` | `100`    | High — Linux writes here first           |
-| `/swapfile`  | `-1`     | Low — SSD failsafe only after zram fills |
+Inert-token note: `zswap.zpool=zsmalloc` was appended live in November 2026 and later proven **inert** — kernel 7.3.1 removed the `zpool` sysfs parameter (zsmalloc is the sole pool). Keep or strip; harmless either way.
 
-**Rule**: Linux writes to the highest priority swap first. This guarantees memory overflow goes into high-speed compressed RAM, with the SSD swapfile as a secondary failsafe.
+### Step 4: verify (post-reboot — surviving the restart is the proof)
+
+```bash
+grep zswap /proc/cmdline                    # all four tokens present
+cat /proc/swaps                             # one device only: /dev/nvme0n1p6, 8388604 KB, prio -1
+cat /sys/module/zswap/parameters/enabled    # Y — reading Y *after* reboot proves the cmdline lane
+free -h | grep -i swap                      # Swap: 8.0Gi
+grep zswp /proc/vmstat                      # zswpin / zswpout grow under memory pressure
+```
+
+### How `max_pool_percent` works (plain words)
+
+25% of this 7G box = a hidden ~1.75G compressed pocket **inside** RAM, holding ~4–5G of real data (zstd ratio). Flow: cold page → caught by zswap *before* the disk → squeezed into the pocket → pocket full → the oldest, most-untouched compressed pages spill to the 8G NVMe partition.
+
+- Higher %: fewer NVMe writes, less free RAM. Lower %: spills sooner, more free RAM. 25% fits 7G — don't tweak until a real swap-storm measurement says so.
+- `shrinker_enabled` stays default (N) on this kernel.
+
+### Related sections
+
+- Section 1A: swappiness `180` pairs with zswap (`game` drops to 10 for gaming).
+- Section 9: `fresh`/flush now restart `dev-nvme0n1p6.swap` — the old `dev-zram0.swap` unit is gone.
+- Relic note: the old `rest` flush alias (`dev-zram0.swap`) was removed from the live `~/.bashrc` and from `setup.sh`/`common/.bashrc` on November 9, 2026; the `fresh` card in Section 9 stays as a manual paste-in.
 
 ---
 
@@ -678,8 +682,8 @@ _(Expected: free space climbs back up, the running kernel's entry is untouched, 
 
 | Item | Default | New Value | Benefit |
 | -------------------------- | ------------- | ------------------ | -------------------------------------------------------- |
-| **vm.swappiness** | `60` | `180` (`game` 10) | zram-first; SSD failsafe; `game` lowers for gaming |
-| **vm.page-cluster** | `0` | `0` | One page per swap I/O — no zram CPU waste |
+| **vm.swappiness** | `60` | `180` (`game` 10) | zswap-first; NVMe p6 spill; `game` lowers for gaming |
+| **vm.page-cluster** | `0` | `0` | One page per swap I/O — no wasted readahead past the zswap pocket |
 | **vm.vfs_cache_pressure** | `100` | `125` | Faster cache reclaim — RAM freed for editors/builds |
 | **vm.dirty_ratio** | `20` | `10` | Smaller writeback bursts — no save/git stalls |
 | **vm.dirty_background_ratio** | `10` | `5` | Earlier background flush — smoother saves |
@@ -697,7 +701,7 @@ _(Expected: free space climbs back up, the running kernel's entry is untouched, 
 | **Secure Boot** | `setup mode` / unenrolled | shim chain + openSUSE CA MOK, `enabled (user)` | ESP boots signed; verify per Section 12 |
 | **ESP free space** | ~35M per kernel entry | reclaim via `kernel-install remove` + `garbage-collect` | Kernel updates keep succeeding (Section 13) |
 | **ext4 reserved blocks** | `5%` | `N/A (btrfs)` | Snapper `pre-dotfiles` snapshot instead |
-| **ZRAM swap** | SSD swapfile | `zstd`, `min(ram)` via `zram-generator` | Fast compressed swap; less SSD wear |
+| **ZSWAP swap** | SSD swapfile only | `zstd`, 8G NVMe `p6`, `max_pool_percent=25` | Compressed RAM pocket, cold pages spill to NVMe; RAM truly freed |
 | **MT7902 Wi-Fi/BT** _(opt)_ | _none_ | `deprecated, in-kernel mt7921e active` | Vendored DKMS driver skipped |
 | **Acer battery health** _(opt)_ | `100%` charge | `skipped by policy` | No WMI driver installed here |
 
@@ -714,4 +718,4 @@ _(Expected: free space climbs back up, the running kernel's entry is untouched, 
 | **CUPS / Avahi** | `enabled` | `disabled` | Less background overhead; BT kept |
 | **Kitty terminal** | stock config | JetBrains Mono 11, 85% opacity, Gruvbox Dark Soft | Gruvbox-consistent GPU terminal |
 | **Starship prompt** | plain bash | Tokyo Night preset (rounded, git + time) | Git-aware visual prompt |
-| **fresh alias** | _none_ | `restart dev-zram0.swap + display-manager` | One-word session reset |
+| **fresh alias** | _none_ | `restart dev-nvme0n1p6.swap + display-manager` | One-word session reset |
