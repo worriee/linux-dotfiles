@@ -422,7 +422,7 @@ alias ani-log='ani-cli -l | tail -10'
 # sort files via organize.sh
 alias orgz='organize.sh'
 # read organize.sh log
-alias orgz-log='cat /home/julry/.local/state/organize.log'
+alias orgz-log='cat /home/julry/.local/state/organize.log | tail -10'
 # read dots.sh log
 alias dots-log='cat /home/julry/.local/state/dots.log | tail -10'
 # read sessions.sh log
