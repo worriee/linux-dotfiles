@@ -81,6 +81,7 @@
   },
 
   "terminal": {
+    "shell": "system",
     "font_family": "JetBrains Mono",
     "button": true,
     "copy_on_select": true,

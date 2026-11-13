@@ -156,7 +156,7 @@
     },
     "panel-button-padding": {
       "type": "i",
-      "value": "-1"
+      "value": "2"
     },
     "custom-panel-color-enabled": {
       "type": "b",
