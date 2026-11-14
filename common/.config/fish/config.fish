@@ -153,8 +153,9 @@ bind \co _h_pick
 
 # down below is my own mods
 
-# ── env & PATH ──
-fish_add_path $HOME/.opencode/bin $HOME/.local/bin
+# ── PATH inits ──
+set -l nv (cat ~/.config/nvm/alias/default)
+fish_add_path -g $HOME/.config/nvm/versions/node/v$nv.*/bin
 
 set -gx ANI_CLI_DOWNLOAD_DIR "$HOME/Videos/ani-cli"
 set -gx NODE_OPTIONS "--max-old-space-size=1536"

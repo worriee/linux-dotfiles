@@ -1,28 +1,48 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
 format = """
-[╭─](bold fg:#769ff0)\
-[░▒▓](#a3aed2)\
+$status\
+[](bold fg:#a3aed2)\
 [ julry](bg:#a3aed2 fg:#090c0c)\
 [](bg:#769ff0 fg:#a3aed2)\
 $directory\
-[](fg:#769ff0 bg:#394260)\
+[](fg:#769ff0 bg:zone_blue)\
 $git_branch\
 $git_status\
-[](fg:#394260 bg:#212736)\
+[](fg:zone_blue bg:zone_blue)\
 $nodejs\
 $bun\
 $rust\
 $golang\
 $php\
-[](fg:#212736 bg:#1d2230)\
+[](fg:zone_blue bg:time_blue)\
 $time\
-[ ](fg:#1d2230)\
+[](fg:time_blue)\
 \n$character"""
 
+palette = "theme"
+
+[palettes.theme]
+curve_ok = "#769ff0"
+curve_err = "#e3242b"
+zone_blue = "#5671A8"
+time_blue = "#42547B"
+
 [character]
-success_symbol = "[╰─❯](bold fg:#769ff0)"
-error_symbol = "[╰─❯](bold fg:#e3242b)"
+success_symbol = "[╰─❯](bold fg:curve_ok)"
+error_symbol = "[╰─❯](bold fg:curve_err)"
+
+[status]
+format = "[$symbol]($style)"
+disabled = false
+success_symbol = "╭─"
+symbol = "╭─"
+not_executable_symbol = "╭─"
+not_found_symbol = "╭─"
+sigint_symbol = "╭─"
+signal_symbol = "╭─"
+success_style = "bold fg:curve_ok"
+failure_style = "bold fg:curve_err"
 
 [directory]
 style = "fg:#e3e5e5 bg:#769ff0"
@@ -38,40 +58,40 @@ truncation_symbol = "…/"
 
 [git_branch]
 symbol = ""
-style = "bg:#394260"
-format = '[[ $symbol $branch ](fg:#769ff0 bg:#394260)]($style)'
+style = "bg:zone_blue"
+format = '[[ $symbol $branch ](fg:#e3e5e5 bg:zone_blue)]($style)'
 
 [git_status]
-style = "bg:#394260"
-format = '[[($all_status$ahead_behind )](fg:#769ff0 bg:#394260)]($style)'
+style = "bg:zone_blue"
+format = '[[($all_status$ahead_behind )](fg:#e3e5e5 bg:zone_blue)]($style)'
 
 [nodejs]
 symbol = ""
-style = "bg:#212736"
-format = '[[ $symbol ($version) ](fg:#769ff0 bg:#212736)]($style)'
+style = "bg:zone_blue"
+format = '[[ $symbol ($version) ](fg:#e3e5e5 bg:zone_blue)]($style)'
 
 [bun]
 symbol = ""
-style = "bg:#212736"
-format = '[[ $symbol ($version) ](fg:#769ff0 bg:#212736)]($style)'
+style = "bg:zone_blue"
+format = '[[ $symbol ($version) ](fg:#e3e5e5 bg:zone_blue)]($style)'
 
 [rust]
 symbol = ""
-style = "bg:#212736"
-format = '[[ $symbol ($version) ](fg:#769ff0 bg:#212736)]($style)'
+style = "bg:zone_blue"
+format = '[[ $symbol ($version) ](fg:#e3e5e5 bg:zone_blue)]($style)'
 
 [golang]
 symbol = ""
-style = "bg:#212736"
-format = '[[ $symbol ($version) ](fg:#769ff0 bg:#212736)]($style)'
+style = "bg:zone_blue"
+format = '[[ $symbol ($version) ](fg:#e3e5e5 bg:zone_blue)]($style)'
 
 [php]
 symbol = ""
-style = "bg:#212736"
-format = '[[ $symbol ($version) ](fg:#769ff0 bg:#212736)]($style)'
+style = "bg:zone_blue"
+format = '[[ $symbol ($version) ](fg:#e3e5e5 bg:zone_blue)]($style)'
 
 [time]
 disabled = false
 time_format = "%I:%M" # Hour:Minute Format
-style = "bg:#1d2230"
-format = '[[ $time ](fg:#a0a9cb bg:#1d2230)]($style)'
+style = "bg:time_blue"
+format = '[[ $time ](fg:#a0a9cb bg:time_blue)]($style)'
