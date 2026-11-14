@@ -391,7 +391,7 @@ snapcfg() {
 
 # check active kernels, boot space, and snapper snapshots
 ksnap() {
-    echo "\n=== Active Kernels ==="
+    echo "=== Active Kernels ==="
   rpm -q kernel-default
   echo -e "\n=== EFI Boot Partition (/boot/efi) ==="
   df -h /boot/efi
