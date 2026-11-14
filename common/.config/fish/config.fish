@@ -335,6 +335,9 @@ function ksnap --description 'check kernels, EFI space, snapshots'
     echo ""
     echo "=== Active Snapper Snapshots ==="
     sudo snapper list
+    echo ""
+    echo "=== Boot Entries ==="
+    sudo sdbootutil list-entries
 end
 
 # ── phone storage helpers ──
